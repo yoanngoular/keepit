@@ -13,9 +13,10 @@ KeepIt is a Kotlin Multiplatform project. Use the repository's Kotlin Toolchain 
 ## Commits and pull requests
 
 - Keep commits focused and independently reviewable. Each commit should represent one coherent change and leave the branch buildable with relevant tests passing.
-- Before submitting a PR to the maintainer, obtain three independent reviews of the same candidate, each from a different reviewer operating from a distinct perspective:
+- For substantive changes, obtain three independent reviews of the same candidate before submitting the PR to the maintainer. Each reviewer operates from a distinct perspective:
   1. Product behavior, UI, and accessibility.
   2. Architecture, maintainability, and Kotlin Multiplatform compatibility.
   3. Test coverage, release reliability, and data integrity, including migrations and scheduling when relevant.
 - Give each reviewer the same diff and acceptance criteria without sharing the other reviews beforehand. Resolve blocking findings and have the affected reviewers recheck material changes before submission.
-- Include the three review summaries and verification results in the PR description. The maintainer performs the final GitHub review.
+- Trivial, narrowly scoped changes can be reviewed by the orchestrator or one independent reviewer. Record why the change qualifies.
+- Include the applicable review summaries and verification results in the PR description. The maintainer performs the final GitHub review.
