@@ -21,6 +21,10 @@ jobs:
         run: .\kotlin.bat test -m shared
       - name: Prepare Android SDK and accept its licenses
         uses: android-actions/setup-android@v4
+        env:
+          # Provision clean package metadata instead of reusing the runner's preinstalled SDK.
+          ANDROID_SDK_ROOT: ${{ runner.temp }}\keepit-android-sdk
+          ANDROID_HOME: ${{ runner.temp }}\keepit-android-sdk
         with:
           cmdline-tools-version: '12266719'
           accept-android-sdk-licenses: 'true'
