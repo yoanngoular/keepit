@@ -10,6 +10,30 @@ This is a Kotlin Multiplatform project targeting Android, Desktop (JVM), iOS, We
 
 The `kotlin` (macOS/Linux) and `kotlin.bat` (Windows) scripts in the project root are self-bootstrapping wrappers for the Kotlin Toolchain: they download the pinned toolchain version on first use, so no separate installation is required. Build the whole project with `./kotlin build`.
 
+### Windows verification loop
+
+Run the same two checks that GitHub runs on each pull request:
+
+```powershell
+.\kotlin.bat test -m shared
+.\kotlin.bat build -m androidApp
+```
+
+For a faster test run while editing shared Kotlin code, use `.\kotlin.bat test -m shared -p jvm`.
+
+To check the app on Android, start an emulator from Android Studio's Device Manager and wait for its home screen. List connected devices, then launch KeepIt on the chosen device:
+
+```powershell
+adb devices -l
+.\kotlin.bat run -m androidApp -d emulator-5554
+adb -s emulator-5554 logcat -d -s AndroidRuntime
+```
+
+Substitute the serial shown by `adb devices -l` if it differs. If `adb` is not on your PATH, use `platform-tools\adb.exe` inside the Android SDK. Check that KeepIt opens and that tapping the demo button displays the greeting. Capture the screen from the emulator toolbar when reviewing UI changes.
+
+The shared Android tests run on the host. The emulator check verifies installation and launch separately.
+
+
 ### Running
 
 Use the run configurations provided by the run widget in your IDE's toolbar. You can also run each module from the command line:
