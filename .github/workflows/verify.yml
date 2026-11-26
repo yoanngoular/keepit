@@ -19,5 +19,11 @@ jobs:
           persist-credentials: false
       - name: Test shared code
         run: .\kotlin.bat test -m shared
+      - name: Prepare Android SDK and accept its licenses
+        uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: '12266719'
+          accept-android-sdk-licenses: 'true'
+          packages: 'build-tools;37.0.0'
       - name: Build the Android app
         run: .\kotlin.bat build -m androidApp
