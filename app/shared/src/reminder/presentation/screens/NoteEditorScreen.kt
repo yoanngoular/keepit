@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,24 +36,29 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.ygoular.keepit.reminder.domain.ReminderNote
+import com.ygoular.keepit.reminder.domain.ReminderRule
 import com.ygoular.keepit.reminder.presentation.components.ErrorText
 import com.ygoular.keepit.reminder.presentation.components.Headline
 import com.ygoular.keepit.reminder.presentation.components.Panel
+import com.ygoular.keepit.reminder.presentation.components.ReminderDateTimeFields
 import com.ygoular.keepit.reminder.presentation.components.WeeklyDayPicker
 import com.ygoular.keepit.reminder.presentation.format.occurrenceLabel
 import com.ygoular.keepit.reminder.presentation.format.ordinalLabel
 import com.ygoular.keepit.reminder.presentation.format.weekdayLabel
 import com.ygoular.keepit.reminder.presentation.model.NoteDraft
 import com.ygoular.keepit.reminder.presentation.model.RepeatCadence
+import com.ygoular.keepit.reminder.domain.isPastOneTimeChange
 import com.ygoular.keepit.resources.*
 import kotlinx.datetime.DayOfWeek
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.resources.StringResource
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 @Composable
 internal fun NoteEditorScreen(
     draft: NoteDraft,
+    originalRule: ReminderRule?,
     now: Instant,
     saving: Boolean,
     failure: StringResource?,
@@ -69,7 +75,10 @@ internal fun NoteEditorScreen(
     }
     val occurrences = remember(rule) { rule?.let { runCatching(it::occurrences).getOrNull() }.orEmpty() }
     val hasContent = draft.title.isNotBlank() || draft.description.isNotBlank()
-    val canSave = rule != null && occurrences.isNotEmpty() && hasContent
+    var rejectedOnSave by remember(draft) { mutableStateOf(false) }
+    val pastOneTime = rejectedOnSave || rule?.isPastOneTimeChange(originalRule, now) == true
+    val canSave = rule != null && occurrences.isNotEmpty() && hasContent && !pastOneTime
+    var showTimeZone by rememberSaveable(draft.id) { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
@@ -101,28 +110,21 @@ internal fun NoteEditorScreen(
             }
             Panel {
                 Text(
-                    stringResource(Res.string.reminder_repeat),
+                    stringResource(Res.string.reminder_schedule),
                     Modifier.semantics { heading() },
                     style = MaterialTheme.typography.titleLarge,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Field(
-                        Res.string.reminder_start_date, draft.date, { onChange(draft.copy(date = it)) },
-                        enabled = !saving,
-                        modifier = Modifier.weight(1.3f),
-                        placeholder = Res.string.reminder_date_hint,
-                    )
-                    Field(
-                        Res.string.reminder_time, draft.time, { onChange(draft.copy(time = it)) },
-                        enabled = !saving,
-                        modifier = Modifier.weight(1f),
-                        placeholder = Res.string.reminder_time_hint,
-                    )
-                }
-                Field(Res.string.reminder_zone, draft.zoneId, { onChange(draft.copy(zoneId = it)) }, enabled = !saving)
+                ReminderDateTimeFields(
+                    date = draft.date,
+                    time = draft.time,
+                    onDateChange = { onChange(draft.copy(date = it)) },
+                    onTimeChange = { onChange(draft.copy(time = it)) },
+                    enabled = !saving,
+                )
                 Choice(
-                    label = Res.string.reminder_frequency,
+                    label = Res.string.reminder_repeat,
                     options = listOf(
+                        stringResource(Res.string.reminder_repeat_off),
                         stringResource(Res.string.reminder_monthly),
                         stringResource(Res.string.reminder_weekly),
                     ),
@@ -131,6 +133,7 @@ internal fun NoteEditorScreen(
                     enabled = !saving,
                 )
                 when (draft.cadence) {
+                    RepeatCadence.ONCE -> Unit
                     RepeatCadence.MONTHLY -> MonthlySettings(draft, onChange, enabled = !saving)
                     RepeatCadence.WEEKLY -> {
                         Field(
@@ -147,14 +150,27 @@ internal fun NoteEditorScreen(
                         )
                     }
                 }
-                Field(Res.string.reminder_count, draft.count, { onChange(draft.copy(count = it)) }, enabled = !saving, numeric = true)
-                if (draft.cadence == RepeatCadence.WEEKLY && draft.weeklyDays.isEmpty()) {
+                if (draft.cadence != RepeatCadence.ONCE) {
+                    Field(
+                        Res.string.reminder_count, draft.count, { onChange(draft.copy(count = it)) },
+                        enabled = !saving, numeric = true,
+                    )
+                }
+                TextButton(onClick = { showTimeZone = !showTimeZone }, enabled = !saving) {
+                    Text(stringResource(Res.string.reminder_zone))
+                }
+                if (showTimeZone) {
+                    Field(Res.string.reminder_zone, draft.zoneId, { onChange(draft.copy(zoneId = it)) }, enabled = !saving)
+                }
+                if (pastOneTime) {
+                    ErrorText(Res.string.reminder_future_required)
+                } else if (draft.cadence == RepeatCadence.WEEKLY && draft.weeklyDays.isEmpty()) {
                     ErrorText(Res.string.reminder_weekdays_required)
                 } else if (rule == null || occurrences.isEmpty()) {
                     ErrorText(Res.string.reminder_invalid_rule)
                 }
             }
-            if (rule != null && occurrences.isNotEmpty()) {
+            if (draft.cadence != RepeatCadence.ONCE && rule != null && occurrences.isNotEmpty()) {
                 Panel(tinted = true) {
                     Text(
                         stringResource(Res.string.reminder_preview),
@@ -181,7 +197,13 @@ internal fun NoteEditorScreen(
         }
         Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
             Button(
-                onClick = { if (rule != null) onSave(draft.toNote(rule)) },
+                onClick = {
+                    if (rule?.isPastOneTimeChange(originalRule, Clock.System.now()) == true) {
+                        rejectedOnSave = true
+                    } else if (rule != null) {
+                        onSave(draft.toNote(rule))
+                    }
+                },
                 enabled = canSave && !saving,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
             ) {
@@ -222,7 +244,7 @@ private fun Field(
     onChange: (String) -> Unit,
     enabled: Boolean,
     modifier: Modifier = Modifier,
-    placeholder: StringResource? = null,
+
     multiline: Boolean = false,
     numeric: Boolean = false,
 ) {
@@ -232,7 +254,7 @@ private fun Field(
         enabled = enabled,
         modifier = modifier.fillMaxWidth(),
         label = { Text(stringResource(label)) },
-        placeholder = placeholder?.let { hint -> { Text(stringResource(hint)) } },
+
         keyboardOptions = KeyboardOptions(keyboardType = if (numeric) KeyboardType.Number else KeyboardType.Text),
         singleLine = !multiline,
         minLines = if (multiline) 3 else 1,

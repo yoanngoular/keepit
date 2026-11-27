@@ -5,7 +5,7 @@ import androidx.sqlite.async.executeSQL
 import androidx.sqlite.async.prepare
 import androidx.sqlite.async.step
 
-private const val VERSION = 2
+private const val VERSION = 3
 
 private fun createNotes(table: String) = """CREATE TABLE $table (
     id TEXT PRIMARY KEY NOT NULL,
@@ -20,18 +20,25 @@ private fun createNotes(table: String) = """CREATE TABLE $table (
         OR
         (rule_kind = 'weekly' AND interval_months IS NULL AND ordinal IS NULL AND weekday IS NULL
             AND interval_weeks IS NOT NULL AND weekdays IS NOT NULL)
+        OR
+        (rule_kind = 'once' AND occurrence_count = 1 AND interval_months IS NULL AND ordinal IS NULL
+            AND weekday IS NULL AND interval_weeks IS NULL AND weekdays IS NULL)
     ))"""
 
-private suspend fun SQLiteConnection.migrateFromVersionOne() {
-    executeSQL(createNotes("notes_v2"))
-    executeSQL(
-        """INSERT INTO notes_v2 (rowid, $NOTE_COLUMNS)
-            SELECT rowid, id, title, description, start_date, local_time, zone_id,
-                interval_months, ordinal, weekday, occurrence_count, revision, consumed,
-                'monthly', NULL, NULL FROM notes"""
-    )
+private suspend fun SQLiteConnection.migrateFromVersionOne() = rebuildNotes(
+    """SELECT rowid, id, title, description, start_date, local_time, zone_id,
+        interval_months, ordinal, weekday, occurrence_count, revision, consumed,
+        'monthly', NULL, NULL FROM notes"""
+)
+
+private suspend fun SQLiteConnection.migrateFromVersionTwo() =
+    rebuildNotes("SELECT rowid, $NOTE_COLUMNS FROM notes")
+
+private suspend fun SQLiteConnection.rebuildNotes(select: String) {
+    executeSQL(createNotes("notes_v3"))
+    executeSQL("INSERT INTO notes_v3 (rowid, $NOTE_COLUMNS) $select")
     executeSQL("DROP TABLE notes")
-    executeSQL("ALTER TABLE notes_v2 RENAME TO notes")
+    executeSQL("ALTER TABLE notes_v3 RENAME TO notes")
 }
 
 private suspend fun SQLiteConnection.version(): Int =
@@ -49,6 +56,7 @@ internal suspend fun SQLiteConnection.ensureNoteSchema() {
             VERSION -> Unit
             0 -> executeSQL(createNotes("notes"))
             1 -> migrateFromVersionOne()
+            2 -> migrateFromVersionTwo()
             else -> error("Missing KeepIt migration from $current to $VERSION")
         }
         executeSQL("PRAGMA user_version = $VERSION")

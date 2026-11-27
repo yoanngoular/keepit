@@ -5,6 +5,7 @@ import com.ygoular.keepit.reminder.domain.ReminderRule
 import com.ygoular.keepit.reminder.domain.ReminderOccurrence
 import com.ygoular.keepit.resources.*
 import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -20,7 +21,12 @@ internal fun occurrenceLabel(occurrence: ReminderOccurrence, rule: ReminderRule)
     )
 }
 
-private fun formatTime(time: LocalTime): String =
+@Composable
+internal fun reminderDateLabel(date: LocalDate): String = stringResource(
+    Res.string.reminder_date_value, date.day, monthLabel(date.month.ordinal), date.year,
+)
+
+internal fun formatTime(time: LocalTime): String =
     time.hour.toString().padStart(2, '0') + ":" + time.minute.toString().padStart(2, '0')
 
 @Composable
