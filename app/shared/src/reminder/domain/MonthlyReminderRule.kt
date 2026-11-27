@@ -11,14 +11,14 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 
 data class MonthlyReminderRule(
-    val startDate: LocalDate,
-    val time: LocalTime,
-    val zoneId: String,
+    override val startDate: LocalDate,
+    override val time: LocalTime,
+    override val zoneId: String,
     val intervalMonths: Int,
     val ordinal: Int,
     val weekday: DayOfWeek,
-    val count: Int,
-) {
+    override val count: Int,
+) : ReminderRule {
     private val zone: TimeZone
 
     init {
@@ -35,7 +35,7 @@ data class MonthlyReminderRule(
      * During a clock change, a nonexistent local time moves forward by the gap and
      * a repeated local time uses its earlier instant.
      */
-    fun occurrences(): List<ReminderOccurrence> = buildList {
+    override fun occurrences(): List<ReminderOccurrence> = buildList {
         val startMonth = LocalDate(startDate.year, startDate.month, 1)
         var month = startMonth
         var foundMatchingMonth = false
