@@ -2,15 +2,20 @@ package com.ygoular.keepit.reminder.presentation.model
 
 import androidx.compose.runtime.saveable.listSaver
 import com.ygoular.keepit.reminder.domain.MonthlyReminderRule
+import com.ygoular.keepit.reminder.domain.OneTimeReminderRule
 import com.ygoular.keepit.reminder.domain.ReminderNote
 import com.ygoular.keepit.reminder.domain.ReminderRule
 import com.ygoular.keepit.reminder.domain.WeeklyReminderRule
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -26,7 +31,7 @@ internal data class NoteDraft(
     val ordinal: Int,
     val weekday: DayOfWeek,
     val count: String,
-    val cadence: RepeatCadence = RepeatCadence.MONTHLY,
+    val cadence: RepeatCadence = RepeatCadence.ONCE,
     val intervalWeeks: String = "1",
     val weeklyDays: Set<DayOfWeek> = setOf(DayOfWeek.MONDAY),
 ) {
@@ -34,8 +39,8 @@ internal data class NoteDraft(
         val parsedDate = LocalDate.parse(date.trim())
         require(parsedDate.year in 1..9999)
         val parsedTime = LocalTime.parse(time.trim())
-        val parsedCount = count.trim().toInt()
         when (cadence) {
+            RepeatCadence.ONCE -> OneTimeReminderRule(parsedDate, parsedTime, zoneId.trim())
             RepeatCadence.MONTHLY -> MonthlyReminderRule(
                 startDate = parsedDate,
                 time = parsedTime,
@@ -43,7 +48,7 @@ internal data class NoteDraft(
                 intervalMonths = interval.trim().toInt(),
                 ordinal = ordinal,
                 weekday = weekday,
-                count = parsedCount,
+                count = count.trim().toInt(),
             )
             RepeatCadence.WEEKLY -> WeeklyReminderRule(
                 startDate = parsedDate,
@@ -51,7 +56,7 @@ internal data class NoteDraft(
                 zoneId = zoneId.trim(),
                 intervalWeeks = intervalWeeks.trim().toInt(),
                 weekdays = weeklyDays,
-                count = parsedCount,
+                count = count.trim().toInt(),
             )
         }
     }.getOrNull()
@@ -95,15 +100,18 @@ internal data class NoteDraft(
         )
 
         @OptIn(ExperimentalUuidApi::class)
-        fun new(): NoteDraft {
-            val zone = TimeZone.currentSystemDefault()
+        fun new(now: Instant = Clock.System.now(), zone: TimeZone = TimeZone.currentSystemDefault()): NoteDraft {
+            val nextHour = generateSequence(now + 1.hours) { it + 1.hours }
+                .map { it.toLocalDateTime(zone) }
+                .map { LocalDateTime(it.date, LocalTime(it.hour, 0)) }
+                .first { it.toInstant(zone) > now }
             return NoteDraft(
                 id = Uuid.random().toString(),
                 isNew = true,
                 title = "",
                 description = "",
-                date = Clock.System.now().toLocalDateTime(zone).date.toString(),
-                time = "09:00",
+                date = nextHour.date.toString(),
+                time = nextHour.time.toString(),
                 zoneId = zone.id,
                 interval = "2",
                 ordinal = 2,
@@ -125,10 +133,12 @@ internal data class NoteDraft(
                 interval = "2",
                 ordinal = 2,
                 weekday = DayOfWeek.TUESDAY,
-                count = rule.count.toString(),
+                count = if (rule is OneTimeReminderRule) "6" else rule.count.toString(),
             )
             return when (rule) {
+                is OneTimeReminderRule -> draft
                 is MonthlyReminderRule -> draft.copy(
+                    cadence = RepeatCadence.MONTHLY,
                     interval = rule.intervalMonths.toString(),
                     ordinal = rule.ordinal,
                     weekday = rule.weekday,

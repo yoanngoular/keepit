@@ -2,6 +2,7 @@ package com.ygoular.keepit.reminder.storage
 
 import androidx.sqlite.SQLiteStatement
 import com.ygoular.keepit.reminder.domain.MonthlyReminderRule
+import com.ygoular.keepit.reminder.domain.OneTimeReminderRule
 import com.ygoular.keepit.reminder.domain.ReminderNote
 import com.ygoular.keepit.reminder.domain.WeeklyReminderRule
 import kotlinx.datetime.DayOfWeek
@@ -24,6 +25,7 @@ internal fun SQLiteStatement.readStoredNote(): StoredNote {
             getText(14).split(',').mapTo(mutableSetOf()) { DayOfWeek.valueOf(it) },
             count,
         )
+        "once" -> OneTimeReminderRule(date, time, zone)
         else -> error("Unknown stored reminder rule kind: $kind")
     }
     return StoredNote(ReminderNote(getText(0), getText(1), getText(2), rule), getText(10), getInt(11))
@@ -47,6 +49,14 @@ internal fun SQLiteStatement.bindStoredNote(row: StoredNote) {
             bindInt(8, rule.ordinal)
             bindText(9, rule.weekday.name)
             bindText(13, "monthly")
+            bindNull(14)
+            bindNull(15)
+        }
+        is OneTimeReminderRule -> {
+            bindNull(7)
+            bindNull(8)
+            bindNull(9)
+            bindText(13, "once")
             bindNull(14)
             bindNull(15)
         }

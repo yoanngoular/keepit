@@ -8,6 +8,7 @@ import com.ygoular.keepit.reminder.domain.ReminderDeliveryPolicy
 import com.ygoular.keepit.reminder.domain.ReminderDeliveryPolicy.AlarmDecision
 import com.ygoular.keepit.reminder.domain.ReminderNote
 import com.ygoular.keepit.reminder.domain.ReminderStore
+import com.ygoular.keepit.reminder.domain.isPastOneTimeChange
 import com.ygoular.keepit.reminder.storage.NoteDatabase
 import com.ygoular.keepit.reminder.storage.StoredNote
 import kotlinx.coroutines.CancellationException
@@ -62,11 +63,15 @@ internal class DeviceReminders private constructor(context: Context) : ReminderS
     override suspend fun save(note: ReminderNote) = withContext(Dispatchers.IO) {
         deliveryLock.withLock {
             val previous = database.find(note.id)
+            val now = Clock.System.now()
+            require(!note.rule.isPastOneTimeChange(previous?.note?.rule, now)) {
+                "A new or changed one-time reminder must be in the future."
+            }
             val row = if (previous?.note?.rule == note.rule) previous.copy(note = note) else {
                 StoredNote(
                     note,
                     UUID.randomUUID().toString(),
-                    ReminderDeliveryPolicy.initialConsumed(note.rule, Clock.System.now()),
+                    ReminderDeliveryPolicy.initialConsumed(note.rule, now),
                 )
             }
             database.save(row)

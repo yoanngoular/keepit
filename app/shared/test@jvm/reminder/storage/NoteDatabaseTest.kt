@@ -3,6 +3,7 @@ package com.ygoular.keepit.reminder.storage
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
 import com.ygoular.keepit.reminder.domain.MonthlyReminderRule
+import com.ygoular.keepit.reminder.domain.OneTimeReminderRule
 import com.ygoular.keepit.reminder.domain.ReminderNote
 import com.ygoular.keepit.reminder.domain.WeeklyReminderRule
 import java.nio.file.Files
@@ -77,13 +78,72 @@ class NoteDatabaseTest {
         driver.open(path).use { connection ->
             connection.prepare("PRAGMA user_version").use { statement ->
                 statement.step()
-                assertEquals(2, statement.getInt(0))
+                assertEquals(3, statement.getInt(0))
             }
             connection.prepare("SELECT rowid FROM notes WHERE id = 'newer'").use { statement ->
                 statement.step()
                 assertEquals(12L, statement.getLong(0))
             }
         }
+    }
+
+    @Test
+    fun upgradesVersionTwoPreservingMonthlyAndWeeklyRules() = onDisk { path ->
+        driver.open(path).use { connection ->
+            connection.execSQL("""CREATE TABLE notes (
+                id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL,
+                start_date TEXT NOT NULL, local_time TEXT NOT NULL, zone_id TEXT NOT NULL,
+                interval_months INTEGER, ordinal INTEGER, weekday TEXT,
+                occurrence_count INTEGER NOT NULL, revision TEXT NOT NULL, consumed INTEGER NOT NULL,
+                rule_kind TEXT NOT NULL, interval_weeks INTEGER, weekdays TEXT,
+                CHECK (
+                    (rule_kind = 'monthly' AND interval_months IS NOT NULL AND ordinal IS NOT NULL AND weekday IS NOT NULL
+                        AND interval_weeks IS NULL AND weekdays IS NULL)
+                    OR
+                    (rule_kind = 'weekly' AND interval_months IS NULL AND ordinal IS NULL AND weekday IS NULL
+                        AND interval_weeks IS NOT NULL AND weekdays IS NOT NULL)
+                ))""")
+            connection.execSQL("""INSERT INTO notes VALUES (
+                'monthly', 'Title', 'Body', '2026-11-01', '08:30', 'Europe/Paris', 2, 3, 'TUESDAY', 9, 'revision', 4,
+                'monthly', NULL, NULL)""")
+            connection.execSQL("""INSERT INTO notes VALUES (
+                'weekly', 'Weekly title', 'Weekly body', '2026-11-25', '08:30', 'Europe/Paris', NULL, NULL, NULL,
+                9, 'weekly-revision', 2, 'weekly', 2, 'MONDAY,FRIDAY')""")
+            connection.execSQL("UPDATE notes SET rowid = 21 WHERE id = 'weekly'")
+            connection.execSQL("PRAGMA user_version = 2")
+        }
+        val weeklyRule = WeeklyReminderRule(
+            LocalDate(2026, 11, 25), LocalTime(8, 30), "Europe/Paris", 2,
+            setOf(DayOfWeek.MONDAY, DayOfWeek.FRIDAY), 9,
+        )
+        val weekly = StoredNote(ReminderNote("weekly", "Weekly title", "Weekly body", weeklyRule), "weekly-revision", 2)
+
+        assertEquals(listOf(weekly, row("monthly").copy(consumed = 4)), NoteDatabase(driver, path).all())
+        driver.open(path).use { connection ->
+            connection.prepare("PRAGMA user_version").use { statement ->
+                statement.step()
+                assertEquals(3, statement.getInt(0))
+            }
+            connection.prepare("SELECT rowid FROM notes WHERE id = 'weekly'").use { statement ->
+                statement.step()
+                assertEquals(21L, statement.getLong(0))
+            }
+        }
+    }
+
+    @Test
+    fun oneTimeRuleRoundTripsWithConsumedState() = onDisk { path ->
+        val db = NoteDatabase(driver, path)
+        val monthly = row("one")
+        val rule = OneTimeReminderRule(LocalDate(2026, 11, 25), LocalTime(8, 30), "Europe/Paris")
+        val oneTime = StoredNote(monthly.note.copy(rule = rule), "one-time-revision", 0)
+        db.save(monthly)
+        db.save(oneTime)
+        assertEquals(oneTime, NoteDatabase(driver, path).find("one"))
+        db.consume("one", 1)
+        assertEquals(oneTime.copy(consumed = 1), NoteDatabase(driver, path).find("one"))
+        db.save(monthly)
+        assertEquals(monthly, db.find("one"))
     }
 
     @Test
@@ -118,7 +178,7 @@ class NoteDatabaseTest {
                 statement.step()
                 assertEquals("Latest", statement.getText(0))
             }
-            connection.prepare("SELECT count(*) FROM sqlite_master WHERE name = 'notes_v2'").use { statement ->
+            connection.prepare("SELECT count(*) FROM sqlite_master WHERE name = 'notes_v3'").use { statement ->
                 statement.step()
                 assertEquals(0, statement.getInt(0))
             }

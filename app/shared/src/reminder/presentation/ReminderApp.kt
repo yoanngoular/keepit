@@ -117,6 +117,7 @@ fun ReminderApp(
                     if (activeDraft != null) {
                         NoteEditorScreen(
                             draft = activeDraft,
+                            originalRule = notes.firstOrNull { it.id == activeDraft.id }?.rule,
                             now = now,
                             saving = saving,
                             failure = failure,
