@@ -12,11 +12,13 @@ data class OneTimeReminderRule(
     override val time: LocalTime,
     override val zoneId: String,
 ) : ReminderRule {
-    override val count = 1
     private val zone = TimeZone.of(zoneId)
 
-    override fun occurrences(): List<ReminderOccurrence> =
-        listOf(ReminderOccurrence(1, LocalDateTime(startDate, time).toInstant(zone)))
+    override fun occurrences(after: Int): Sequence<ReminderOccurrence> {
+        require(after >= 0) { "Occurrence number must not be negative." }
+        if (after >= 1) return emptySequence()
+        return sequenceOf(ReminderOccurrence(1, LocalDateTime(startDate, time).toInstant(zone)))
+    }
 }
 
 /** An unchanged reminder does not block editing the note after its scheduled time. */

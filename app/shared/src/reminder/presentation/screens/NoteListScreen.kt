@@ -17,7 +17,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -26,6 +25,7 @@ import com.ygoular.keepit.reminder.domain.ReminderNote
 import com.ygoular.keepit.reminder.presentation.components.ErrorText
 import com.ygoular.keepit.reminder.presentation.components.Headline
 import com.ygoular.keepit.reminder.presentation.components.Panel
+import com.ygoular.keepit.reminder.presentation.components.upcomingOccurrences
 import com.ygoular.keepit.reminder.presentation.format.occurrenceLabel
 import com.ygoular.keepit.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -91,8 +91,7 @@ internal fun NoteListScreen(
                 }
             }
             else -> items(notes, key = { it.id }) { note ->
-                val occurrences = remember(note.rule) { note.rule.occurrences() }
-                val next = occurrences.firstOrNull { it.at >= now }
+                val upcoming = upcomingOccurrences(note.rule, now, limit = 1)
                 Surface(
                     onClick = { onOpen(note) },
                     modifier = Modifier.fillMaxWidth(),
@@ -109,16 +108,19 @@ internal fun NoteListScreen(
                         if (note.title.isNotBlank() && note.description.isNotBlank()) {
                             Text(note.description, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
-                        val detail = if (next == null) {
-                            stringResource(Res.string.reminder_no_upcoming)
-                        } else {
-                            stringResource(Res.string.reminder_next, occurrenceLabel(next, note.rule))
+                        if (upcoming != null) {
+                            val next = upcoming.firstOrNull()
+                            val detail = if (next == null) {
+                                stringResource(Res.string.reminder_no_upcoming)
+                            } else {
+                                stringResource(Res.string.reminder_next, occurrenceLabel(next, note.rule))
+                            }
+                            Text(
+                                detail,
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
                         }
-                        Text(
-                            detail,
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelLarge,
-                        )
                     }
                 }
             }

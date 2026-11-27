@@ -3,12 +3,9 @@ package com.ygoular.keepit.reminder.domain
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
-import kotlinx.datetime.plus
-import kotlinx.datetime.toInstant
 
 data class MonthlyReminderRule(
     override val startDate: LocalDate,
@@ -17,44 +14,52 @@ data class MonthlyReminderRule(
     val intervalMonths: Int,
     val ordinal: Int,
     val weekday: DayOfWeek,
-    override val count: Int,
+    val endDate: LocalDate?,
 ) : ReminderRule {
     private val zone: TimeZone
 
     init {
         require(intervalMonths in 1..120) { "Month interval must be between 1 and 120." }
         require(ordinal in 1..5) { "Weekday ordinal must be between 1 and 5." }
-        require(count in 1..100) { "Occurrence count must be between 1 and 100." }
+        require(endDate == null || endDate >= startDate) { "End date must not be before the start date." }
         zone = TimeZone.of(zoneId)
     }
 
-    /**
-     * Calculates the series from its start month in the rule's timezone.
-     *
-     * A missing fifth weekday is skipped. An impossible month pattern returns an empty list.
-     * During a clock change, a nonexistent local time moves forward by the gap and
-     * a repeated local time uses its earlier instant.
-     */
-    override fun occurrences(): List<ReminderOccurrence> = buildList {
-        val startMonth = LocalDate(startDate.year, startDate.month, 1)
-        var month = startMonth
+    override fun occurrences(after: Int): Sequence<ReminderOccurrence> {
+        require(after >= 0) { "Occurrence number must not be negative." }
+        if (after == Int.MAX_VALUE) return emptySequence()
+        val dates = if (ordinal == 5) {
+            scheduledDates().drop(after)
+        } else {
+            // The first four ordinals exist in every month. Only the start month can be partial.
+            val startMonth = LocalDate(startDate.year, startDate.month, 1)
+            val firstMonthIndex = if (checkNotNull(dateIn(startMonth)) < startDate) 1 else 0
+            datesFromMonth(startMonth, after.toLong() + firstMonthIndex)
+        }
+        return dates.toOccurrences(time, zone, after)
+    }
+
+    internal fun scheduledDates(): Sequence<LocalDate> =
+        datesFromMonth(LocalDate(startDate.year, startDate.month, 1), 0)
+
+    private fun dateIn(month: LocalDate): LocalDate? {
+        val firstMatch = (weekday.isoDayNumber - month.dayOfWeek.isoDayNumber + 7) % 7
+        return month.advanceOrNull((firstMatch + (ordinal - 1) * 7).toLong(), DateTimeUnit.DAY)
+            ?.takeIf { it.month == month.month }
+    }
+
+    private fun datesFromMonth(startMonth: LocalDate, monthIndex: Long): Sequence<LocalDate> = sequence {
+        var month = startMonth.advanceOrNull(monthIndex * intervalMonths, DateTimeUnit.MONTH) ?: return@sequence
         var foundMatchingMonth = false
-
-        while (size < count) {
-            val firstMatch = (weekday.isoDayNumber - month.dayOfWeek.isoDayNumber + 7) % 7
-            val candidate = month.plus(firstMatch + (ordinal - 1) * 7, DateTimeUnit.DAY)
-
-            if (candidate.month == month.month) {
+        while (endDate == null || month <= endDate) {
+            val candidate = dateIn(month)
+            if (candidate != null) {
                 foundMatchingMonth = true
-                if (candidate >= startDate) {
-                    val instant = LocalDateTime(candidate, time).toInstant(zone)
-                    add(ReminderOccurrence(size + 1, instant))
-                }
+                if (endDate != null && candidate > endDate) break
+                if (candidate >= startDate) yield(candidate)
             }
 
-            if (size == count) break
-            month = month.plus(intervalMonths, DateTimeUnit.MONTH)
-
+            month = month.advanceOrNull(intervalMonths.toLong(), DateTimeUnit.MONTH) ?: break
             // The arrangement of weekdays repeats every 400 Gregorian years.
             if (!foundMatchingMonth && month.month == startMonth.month &&
                 (month.year - startMonth.year) % 400 == 0

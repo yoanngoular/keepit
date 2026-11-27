@@ -17,7 +17,7 @@ class MonthlyReminderTimeZoneTest {
             intervalMonths = 2,
             ordinal = 2,
             weekday = DayOfWeek.TUESDAY,
-            count = 6,
+            endDate = LocalDate(2026, 11, 10),
         )
 
         assertEquals(
@@ -29,31 +29,31 @@ class MonthlyReminderTimeZoneTest {
                 "2026-09-08T07:00:00Z",
                 "2026-11-10T08:00:00Z",
             ).map(Instant::parse),
-            rule.occurrences().map(ReminderOccurrence::at),
+            rule.occurrences().map(ReminderOccurrence::at).toList(),
         )
     }
 
     @Test
     fun `move nonexistent wall time forward by the clock gap`() {
-        val rule = transitionSunday(startDate = LocalDate(2026, 3, 1), ordinal = 5)
+        val rule = transitionSunday(startDate = LocalDate(2026, 3, 1), endDate = LocalDate(2026, 3, 29), ordinal = 5)
 
-        assertEquals(listOf(ReminderOccurrence(1, Instant.parse("2026-03-29T01:30:00Z"))), rule.occurrences())
+        assertEquals(listOf(ReminderOccurrence(1, Instant.parse("2026-03-29T01:30:00Z"))), rule.occurrences().toList())
     }
 
     @Test
     fun `use earlier instant when clocks repeat a wall time`() {
-        val rule = transitionSunday(startDate = LocalDate(2026, 10, 1), ordinal = 4)
+        val rule = transitionSunday(startDate = LocalDate(2026, 10, 1), endDate = LocalDate(2026, 10, 25), ordinal = 4)
 
-        assertEquals(listOf(ReminderOccurrence(1, Instant.parse("2026-10-25T00:30:00Z"))), rule.occurrences())
+        assertEquals(listOf(ReminderOccurrence(1, Instant.parse("2026-10-25T00:30:00Z"))), rule.occurrences().toList())
     }
 
-    private fun transitionSunday(startDate: LocalDate, ordinal: Int) = MonthlyReminderRule(
+    private fun transitionSunday(startDate: LocalDate, endDate: LocalDate, ordinal: Int) = MonthlyReminderRule(
         startDate = startDate,
         time = LocalTime(2, 30),
         zoneId = "Europe/Paris",
         intervalMonths = 1,
         ordinal = ordinal,
         weekday = DayOfWeek.SUNDAY,
-        count = 1,
+        endDate = endDate,
     )
 }

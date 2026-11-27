@@ -28,7 +28,7 @@ class NoteDraftTest {
     @Test
     fun `new note defaults to one reminder and ignores repeat settings`() {
         val draft = NoteDraft.new().copy(
-            date = "2026-12-02", time = "17:20", zoneId = "UTC", count = "",
+            date = "2026-12-02", time = "17:20", zoneId = "UTC", endDate = LocalDate(2026, 12, 1),
         )
         assertEquals(RepeatCadence.ONCE, draft.cadence)
         val rule = OneTimeReminderRule(LocalDate(2026, 12, 2), LocalTime(17, 20), "UTC")
@@ -40,13 +40,18 @@ class NoteDraftTest {
 
     @Test
     fun `previous monthly drafts without a saved cadence still restore as monthly`() {
-        val draft = NoteDraft.new().copy(zoneId = "UTC", cadence = RepeatCadence.MONTHLY)
+        val draft = NoteDraft.new().copy(
+            date = "2026-10-01", zoneId = "UTC", cadence = RepeatCadence.MONTHLY,
+        )
         val oldFields = listOf(
             draft.id, draft.title, draft.description, draft.date, draft.time, draft.zoneId,
-            draft.interval, draft.ordinal.toString(), draft.weekday.name, draft.count, draft.isNew.toString(),
+            draft.interval, draft.ordinal.toString(), draft.weekday.name, "2", draft.isNew.toString(),
         )
         val restored = assertNotNull(NoteDraft.saver.restore(ArrayList(oldFields)))
-        val expectedRule = assertIs<MonthlyReminderRule>(draft.parseRule())
+        val expectedRule = assertIs<MonthlyReminderRule>(
+            draft.copy(endDate = LocalDate(2026, 12, 8)).parseRule(),
+        )
+        assertEquals(LocalDate(2026, 12, 8), restored.endDate)
         assertEquals(expectedRule, restored.parseRule())
         assertEquals(RepeatCadence.MONTHLY, NoteDraft.fromNote(draft.toNote(expectedRule)).cadence)
     }
@@ -70,8 +75,10 @@ class NoteDraftTest {
         val draft = NoteDraft.new().copy(
             zoneId = "UTC",
             cadence = RepeatCadence.WEEKLY,
+            date = "2026-12-02",
             intervalWeeks = "3",
             weeklyDays = days,
+            endDate = LocalDate(2027, 1, 2),
         )
         val savedState = with(NoteDraft.saver) { assertNotNull(SaverScope { true }.save(draft)) }
         val restored = assertNotNull(NoteDraft.saver.restore(savedState))
@@ -80,7 +87,24 @@ class NoteDraftTest {
         assertEquals(draft, restored)
         assertEquals(3, rule.intervalWeeks)
         assertEquals(days, rule.weekdays)
-        assertEquals(rule, NoteDraft.fromNote(restored.toNote(rule)).parseRule())
+        assertEquals(draft.endDate, rule.endDate)
+        val reopened = NoteDraft.fromNote(restored.toNote(rule))
+        assertEquals(rule, reopened.parseRule())
+        val unbounded = assertIs<WeeklyReminderRule>(reopened.copy(endDate = null).parseRule())
+        assertNull(unbounded.endDate)
+    }
+
+    @Test
+    fun `end date may match the start but cannot precede it`() {
+        val draft = NoteDraft.new().copy(
+            date = "2026-12-03",
+            zoneId = "UTC",
+            cadence = RepeatCadence.WEEKLY,
+            weeklyDays = setOf(DayOfWeek.THURSDAY),
+        )
+        assertNull(draft.copy(endDate = LocalDate(2026, 12, 2)).parseRule())
+        val sameDay = assertIs<WeeklyReminderRule>(draft.copy(endDate = LocalDate(2026, 12, 3)).parseRule())
+        assertEquals(1, sameDay.occurrences().count())
     }
 
     @Test

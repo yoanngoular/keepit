@@ -16,7 +16,7 @@ class WeeklyReminderTimeZoneTest {
             zoneId = "Europe/Paris",
             intervalWeeks = 1,
             weekdays = setOf(DayOfWeek.SUNDAY),
-            count = 3,
+            endDate = LocalDate(2026, 4, 5),
         )
 
         assertEquals(
@@ -25,7 +25,7 @@ class WeeklyReminderTimeZoneTest {
                 "2026-03-29T01:30:00Z",
                 "2026-04-05T00:30:00Z",
             ).map(Instant::parse),
-            rule.occurrences().map(ReminderOccurrence::at),
+            rule.occurrences().map(ReminderOccurrence::at).toList(),
         )
     }
 }
