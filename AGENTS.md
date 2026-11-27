@@ -2,6 +2,14 @@
 
 KeepIt is a Kotlin Multiplatform project. Use the repository's Kotlin Toolchain wrapper. Develop behavior with TDD, keep the shared domain independent of platform APIs, and preserve KeepIt notes and reminders across database upgrades.
 
+## Architecture
+
+- Group files by feature and responsibility. Keep theme definitions, screen composables, form state and validation, and domain models in distinct files.
+- Share domain behavior, UI, SQL schema, migrations, and repository logic across targets when supported by the current toolchain.
+- Prefer maintained open-source multiplatform libraries that have been verified with KeepIt. Keep database drivers and file paths, permissions, system alarms, and notification delivery in focused platform adapters.
+- Introduce common abstractions for dependencies the domain actually needs.
+
+
 ## Agent orchestration
 
 - Delegate repository research to exploration agents and delivery planning to planning agents.
