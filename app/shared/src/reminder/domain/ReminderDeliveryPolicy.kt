@@ -4,17 +4,17 @@ import kotlin.time.Instant
 
 object ReminderDeliveryPolicy {
     /** Occurrences that have already passed are skipped when a series is first saved. */
-    fun initialConsumed(rule: MonthlyReminderRule, now: Instant): Int =
+    fun initialConsumed(rule: ReminderRule, now: Instant): Int =
         rule.occurrences().lastOrNull { it.at <= now }?.number ?: 0
 
     /** Coalesce missed occurrences into the latest due one, then continue the same series. */
-    fun next(rule: MonthlyReminderRule, consumed: Int, now: Instant): ReminderOccurrence? {
+    fun next(rule: ReminderRule, consumed: Int, now: Instant): ReminderOccurrence? {
         val pending = rule.occurrences().filter { it.number > consumed }
         return pending.lastOrNull { it.at <= now } ?: pending.firstOrNull()
     }
 
     fun onAlarm(
-        rule: MonthlyReminderRule,
+        rule: ReminderRule,
         consumed: Int,
         now: Instant,
         revision: String,
