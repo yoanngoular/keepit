@@ -3,6 +3,7 @@ package com.ygoular.keepit.reminder.domain
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
+import kotlinx.datetime.daysUntil
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -16,7 +17,7 @@ class ReminderDeliveryPolicyTest {
         intervalMonths = 2,
         ordinal = 2,
         weekday = DayOfWeek.TUESDAY,
-        count = 3,
+        endDate = LocalDate(2026, 5, 12),
     )
     private val first = ReminderOccurrence(1, Instant.parse("2026-01-13T09:00:00Z"))
     private val second = ReminderOccurrence(2, Instant.parse("2026-03-10T09:00:00Z"))
@@ -72,6 +73,67 @@ class ReminderDeliveryPolicyTest {
         assertEquals(
             ReminderDeliveryPolicy.AlarmDecision.Deliver(first),
             ReminderDeliveryPolicy.onAlarm(rule, 0, first.at, "current", "current", 1),
+        )
+    }
+
+    @Test
+    fun `open ended rule returns without reading past the first future date`() {
+        val unbounded = rule.copy(endDate = null)
+
+        assertEquals(2, ReminderDeliveryPolicy.initialConsumed(unbounded, afterSecond))
+        assertEquals(second, ReminderDeliveryPolicy.next(unbounded, consumed = 0, now = afterSecond))
+        assertEquals(third, ReminderDeliveryPolicy.next(unbounded, consumed = 2, now = afterSecond))
+    }
+
+    @Test
+    fun `upcoming includes an exact match and never exceeds the requested limit`() {
+        assertEquals(listOf(first, second), ReminderDeliveryPolicy.upcoming(rule, first.at, limit = 2))
+        assertEquals(emptyList(), ReminderDeliveryPolicy.upcoming(rule, first.at, limit = 0))
+        assertEquals(listOf(third), ReminderDeliveryPolicy.upcoming(rule, afterSecond, limit = 2))
+        assertEquals(
+            emptyList(),
+            ReminderDeliveryPolicy.upcoming(rule, Instant.parse("2026-05-12T09:00:01Z"), limit = 2),
+        )
+    }
+
+    @Test
+    fun `seek old monthly and weekly anchors without changing occurrence numbers`() {
+        val origin = LocalDate(1, 1, 1)
+        val requestedDate = LocalDate(2026, 8, 3)
+        val now = Instant.parse("2026-08-03T09:00:00Z")
+        val monthly = rule.copy(
+            startDate = origin, intervalMonths = 1, weekday = DayOfWeek.MONDAY, ordinal = 1, endDate = null,
+        )
+        val weekly = WeeklyReminderRule(
+            origin, LocalTime(9, 0), "UTC", 1, setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY), endDate = null,
+        )
+        val elapsedMonths = (requestedDate.year - origin.year) * 12 + 7
+        val elapsedWeeks = origin.daysUntil(requestedDate) / 7
+
+        assertEquals(
+            listOf(ReminderOccurrence(elapsedMonths + 1, now)),
+            ReminderDeliveryPolicy.upcoming(monthly, now, limit = 1),
+        )
+        assertEquals(
+            listOf(
+                ReminderOccurrence(elapsedWeeks * 2 + 1, now),
+                ReminderOccurrence(elapsedWeeks * 2 + 2, Instant.parse("2026-08-05T09:00:00Z")),
+            ),
+            ReminderDeliveryPolicy.upcoming(weekly, now, limit = 2),
+        )
+        assertEquals(elapsedWeeks * 2 + 1, ReminderDeliveryPolicy.initialConsumed(weekly, now))
+    }
+
+    @Test
+    fun `upcoming can skip missing fifth weekdays`() {
+        val fifth = rule.copy(intervalMonths = 1, ordinal = 5, endDate = null)
+
+        assertEquals(
+            listOf(
+                ReminderOccurrence(2, Instant.parse("2026-06-30T09:00:00Z")),
+                ReminderOccurrence(3, Instant.parse("2026-09-29T09:00:00Z")),
+            ),
+            ReminderDeliveryPolicy.upcoming(fifth, Instant.parse("2026-05-01T00:00:00Z"), limit = 2),
         )
     }
 }

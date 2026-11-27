@@ -7,7 +7,7 @@ sealed interface ReminderRule {
     val startDate: LocalDate
     val time: LocalTime
     val zoneId: String
-    val count: Int
 
-    fun occurrences(): List<ReminderOccurrence>
+    /** Occurrences with a number greater than [after], in chronological order. */
+    fun occurrences(after: Int = 0): Sequence<ReminderOccurrence>
 }

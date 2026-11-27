@@ -30,7 +30,7 @@ internal data class NoteDraft(
     val interval: String,
     val ordinal: Int,
     val weekday: DayOfWeek,
-    val count: String,
+    val endDate: LocalDate? = null,
     val cadence: RepeatCadence = RepeatCadence.ONCE,
     val intervalWeeks: String = "1",
     val weeklyDays: Set<DayOfWeek> = setOf(DayOfWeek.MONDAY),
@@ -48,7 +48,7 @@ internal data class NoteDraft(
                 intervalMonths = interval.trim().toInt(),
                 ordinal = ordinal,
                 weekday = weekday,
-                count = count.trim().toInt(),
+                endDate = endDate,
             )
             RepeatCadence.WEEKLY -> WeeklyReminderRule(
                 startDate = parsedDate,
@@ -56,10 +56,23 @@ internal data class NoteDraft(
                 zoneId = zoneId.trim(),
                 intervalWeeks = intervalWeeks.trim().toInt(),
                 weekdays = weeklyDays,
-                count = count.trim().toInt(),
+                endDate = endDate,
             )
         }
     }.getOrNull()
+
+    private fun restoreEndDate(value: String): LocalDate? {
+        val legacyCount = value.toIntOrNull()
+        if (legacyCount == null) return runCatching { LocalDate.parse(value) }.getOrNull()
+        // Previous drafts stored an occurrence count at this position.
+        if (legacyCount !in 1..100) return null
+        val dates = when (val rule = parseRule()) {
+            is MonthlyReminderRule -> rule.scheduledDates()
+            is WeeklyReminderRule -> rule.scheduledDates()
+            else -> return null
+        }
+        return dates.take(legacyCount).lastOrNull()
+    }
 
     fun toNote(rule: ReminderRule): ReminderNote = ReminderNote(
         id = id,
@@ -74,7 +87,8 @@ internal data class NoteDraft(
                 draft?.run {
                     listOf(
                         id, title, description, date, time, zoneId, interval, ordinal.toString(), weekday.name,
-                        count, isNew.toString(), cadence.name, intervalWeeks, weeklyDays.joinToString(",") { it.name },
+                        endDate?.toString().orEmpty(), isNew.toString(), cadence.name,
+                        intervalWeeks, weeklyDays.joinToString(",") { it.name },
                     )
                 }.orEmpty()
             },
@@ -89,13 +103,12 @@ internal data class NoteDraft(
                     interval = values[6],
                     ordinal = values[7].toInt(),
                     weekday = DayOfWeek.valueOf(values[8]),
-                    count = values[9],
                     isNew = values[10].toBooleanStrict(),
                     cadence = values.getOrNull(11)?.let(RepeatCadence::valueOf) ?: RepeatCadence.MONTHLY,
                     intervalWeeks = values.getOrNull(12) ?: "1",
                     weeklyDays = values.getOrNull(13)?.split(',')?.filter(String::isNotEmpty)
                         ?.map(DayOfWeek::valueOf)?.toSet() ?: setOf(DayOfWeek.MONDAY),
-                )
+                ).let { it.copy(endDate = it.restoreEndDate(values[9])) }
             },
         )
 
@@ -116,7 +129,6 @@ internal data class NoteDraft(
                 interval = "2",
                 ordinal = 2,
                 weekday = DayOfWeek.TUESDAY,
-                count = "6",
             )
         }
 
@@ -133,7 +145,6 @@ internal data class NoteDraft(
                 interval = "2",
                 ordinal = 2,
                 weekday = DayOfWeek.TUESDAY,
-                count = if (rule is OneTimeReminderRule) "6" else rule.count.toString(),
             )
             return when (rule) {
                 is OneTimeReminderRule -> draft
@@ -142,11 +153,13 @@ internal data class NoteDraft(
                     interval = rule.intervalMonths.toString(),
                     ordinal = rule.ordinal,
                     weekday = rule.weekday,
+                    endDate = rule.endDate,
                 )
                 is WeeklyReminderRule -> draft.copy(
                     cadence = RepeatCadence.WEEKLY,
                     intervalWeeks = rule.intervalWeeks.toString(),
                     weeklyDays = rule.weekdays,
+                    endDate = rule.endDate,
                 )
             }
         }

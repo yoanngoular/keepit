@@ -43,11 +43,14 @@
     <string name="reminder_interval">Répéter tous les N mois</string>
     <string name="reminder_ordinal">Rang dans le mois</string>
     <string name="reminder_weekday">Jour de la semaine</string>
-    <string name="reminder_count">Nombre de rappels</string>
+    <string name="reminder_end_date">Date de fin</string>
+    <string name="reminder_no_end_date">Sans date de fin</string>
+    <string name="reminder_clear_end_date">Retirer la date de fin</string>
+    <string name="reminder_end_before_start">Choisissez une date de fin à partir de la date de début.</string>
     <string name="reminder_invalid_rule">Vérifiez la date, le fuseau horaire et les paramètres de récurrence.</string>
     <string name="reminder_preview">Rappels à venir</string>
     <string name="reminder_preview_description">Dates et heures dans le fuseau %1$s.</string>
-    <string name="reminder_more_dates">%1$d de plus</string>
+    <string name="reminder_more_dates">Autres dates</string>
     <string name="reminder_saving">Enregistrement…</string>
     <string name="reminder_save">Enregistrer</string>
     <string name="reminder_occurrence_date">%1$s %2$d %3$s %4$d à %5$s</string>

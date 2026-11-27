@@ -46,12 +46,12 @@ class NoteDatabase(private val driver: SQLiteDriver, private val path: String) {
     suspend fun save(row: StoredNote) {
         withDatabase { connection ->
             connection.prepare(
-                """INSERT INTO notes ($NOTE_COLUMNS) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """INSERT INTO notes ($NOTE_COLUMNS) VALUES ($NOTE_VALUES)
                     ON CONFLICT(id) DO UPDATE SET
                     title = excluded.title, description = excluded.description,
                     start_date = excluded.start_date, local_time = excluded.local_time, zone_id = excluded.zone_id,
                     interval_months = excluded.interval_months, ordinal = excluded.ordinal,
-                    weekday = excluded.weekday, occurrence_count = excluded.occurrence_count,
+                    weekday = excluded.weekday, end_date = excluded.end_date,
                     revision = excluded.revision, consumed = excluded.consumed,
                     rule_kind = excluded.rule_kind, interval_weeks = excluded.interval_weeks, weekdays = excluded.weekdays"""
             ).use { statement ->

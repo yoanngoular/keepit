@@ -5,15 +5,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,11 +27,7 @@ import com.ygoular.keepit.reminder.presentation.format.reminderDateLabel
 import com.ygoular.keepit.resources.*
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atStartOfDayIn
-import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.compose.resources.stringResource
-import kotlin.time.Instant
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,28 +60,12 @@ internal fun ReminderDateTimeFields(
         )
     }
     if (pickingDate) {
-        val year = parsedDate?.year ?: 2000
-        val picker = rememberDatePickerState(
-            initialSelectedDateMillis = parsedDate?.atStartOfDayIn(TimeZone.UTC)?.toEpochMilliseconds(),
-            yearRange = minOf(1900, year)..maxOf(2100, year),
+        ReminderDatePickerDialog(
+            initialDate = parsedDate,
+            enabled = enabled,
+            onSelect = { onDateChange(it.toString()) },
+            onDismiss = { pickingDate = false },
         )
-        DatePickerDialog(
-            onDismissRequest = { pickingDate = false },
-            confirmButton = {
-                TextButton(
-                    enabled = enabled && picker.selectedDateMillis != null,
-                    onClick = {
-                        picker.selectedDateMillis?.let { millis ->
-                            onDateChange(Instant.fromEpochMilliseconds(millis).toLocalDateTime(TimeZone.UTC).date.toString())
-                        }
-                        pickingDate = false
-                    },
-                ) { Text(stringResource(Res.string.reminder_picker_done)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pickingDate = false }) { Text(stringResource(Res.string.reminder_cancel)) }
-            },
-        ) { DatePicker(state = picker) }
     }
     if (pickingTime) {
         val picker = rememberTimePickerState(
@@ -114,7 +91,7 @@ internal fun ReminderDateTimeFields(
 }
 
 @Composable
-private fun PickerButton(label: String, value: String, onClick: () -> Unit, enabled: Boolean, modifier: Modifier) {
+internal fun PickerButton(label: String, value: String, onClick: () -> Unit, enabled: Boolean, modifier: Modifier) {
     Column(modifier) {
         Text(label, style = MaterialTheme.typography.labelMedium)
         OutlinedButton(

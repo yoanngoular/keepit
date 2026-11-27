@@ -43,11 +43,14 @@
     <string name="reminder_interval">Repeat every N months</string>
     <string name="reminder_ordinal">Week of the month</string>
     <string name="reminder_weekday">Day of the week</string>
-    <string name="reminder_count">Total occurrences</string>
+    <string name="reminder_end_date">End date</string>
+    <string name="reminder_no_end_date">No end date</string>
+    <string name="reminder_clear_end_date">Clear end date</string>
+    <string name="reminder_end_before_start">Choose an end date on or after the start date.</string>
     <string name="reminder_invalid_rule">Check the date, time zone and recurrence settings.</string>
     <string name="reminder_preview">Upcoming reminders</string>
     <string name="reminder_preview_description">Dates and times in %1$s.</string>
-    <string name="reminder_more_dates">%1$d more</string>
+    <string name="reminder_more_dates">More dates</string>
     <string name="reminder_saving">Saving…</string>
     <string name="reminder_save">Save note</string>
     <string name="reminder_occurrence_date">%1$s, %3$s %2$d, %4$d · %5$s</string>

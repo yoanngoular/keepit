@@ -19,10 +19,9 @@ class OneTimeReminderRuleTest {
 
     @Test
     fun `resolve exactly one occurrence on the configured date`() {
-        assertEquals(1, rule.count)
         assertEquals(
             listOf(ReminderOccurrence(1, Instant.parse("2027-01-07T14:35:00Z"))),
-            rule.occurrences(),
+            rule.occurrences().toList(),
         )
     }
 
@@ -30,7 +29,7 @@ class OneTimeReminderRuleTest {
     fun `use the rule time zone to resolve the local wall time`() {
         assertEquals(
             listOf(ReminderOccurrence(1, Instant.parse("2027-01-07T09:05:00Z"))),
-            rule.copy(zoneId = "+05:30").occurrences(),
+            rule.copy(zoneId = "+05:30").occurrences().toList(),
         )
         assertFailsWith<IllegalArgumentException> { rule.copy(zoneId = "Invalid/Zone") }
     }

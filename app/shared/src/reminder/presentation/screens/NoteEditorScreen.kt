@@ -6,12 +6,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -41,7 +43,9 @@ import com.ygoular.keepit.reminder.presentation.components.ErrorText
 import com.ygoular.keepit.reminder.presentation.components.Headline
 import com.ygoular.keepit.reminder.presentation.components.Panel
 import com.ygoular.keepit.reminder.presentation.components.ReminderDateTimeFields
+import com.ygoular.keepit.reminder.presentation.components.ReminderEndDateField
 import com.ygoular.keepit.reminder.presentation.components.WeeklyDayPicker
+import com.ygoular.keepit.reminder.presentation.components.upcomingOccurrences
 import com.ygoular.keepit.reminder.presentation.format.occurrenceLabel
 import com.ygoular.keepit.reminder.presentation.format.ordinalLabel
 import com.ygoular.keepit.reminder.presentation.format.weekdayLabel
@@ -50,6 +54,7 @@ import com.ygoular.keepit.reminder.presentation.model.RepeatCadence
 import com.ygoular.keepit.reminder.domain.isPastOneTimeChange
 import com.ygoular.keepit.resources.*
 import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Clock
@@ -68,16 +73,19 @@ internal fun NoteEditorScreen(
     onSave: (ReminderNote) -> Unit,
 ) {
     val rule = remember(
-        draft.date, draft.time, draft.zoneId, draft.interval, draft.ordinal, draft.weekday, draft.count,
+        draft.date, draft.time, draft.zoneId, draft.interval, draft.ordinal, draft.weekday, draft.endDate,
         draft.cadence, draft.intervalWeeks, draft.weeklyDays,
     ) {
         draft.parseRule()
     }
-    val occurrences = remember(rule) { rule?.let { runCatching(it::occurrences).getOrNull() }.orEmpty() }
+    val hasOccurrence = remember(rule) { runCatching { rule?.occurrences()?.any() == true }.getOrDefault(false) }
+    val startDate = remember(draft.date) { runCatching { LocalDate.parse(draft.date.trim()) }.getOrNull() }
+    val endBeforeStart = draft.cadence != RepeatCadence.ONCE && startDate != null &&
+        draft.endDate?.let { it < startDate } == true
     val hasContent = draft.title.isNotBlank() || draft.description.isNotBlank()
     var rejectedOnSave by remember(draft) { mutableStateOf(false) }
     val pastOneTime = rejectedOnSave || rule?.isPastOneTimeChange(originalRule, now) == true
-    val canSave = rule != null && occurrences.isNotEmpty() && hasContent && !pastOneTime
+    val canSave = rule != null && hasOccurrence && hasContent && !pastOneTime
     var showTimeZone by rememberSaveable(draft.id) { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -151,9 +159,11 @@ internal fun NoteEditorScreen(
                     }
                 }
                 if (draft.cadence != RepeatCadence.ONCE) {
-                    Field(
-                        Res.string.reminder_count, draft.count, { onChange(draft.copy(count = it)) },
-                        enabled = !saving, numeric = true,
+                    ReminderEndDateField(
+                        endDate = draft.endDate,
+                        startDate = startDate,
+                        onChange = { onChange(draft.copy(endDate = it)) },
+                        enabled = !saving,
                     )
                 }
                 TextButton(onClick = { showTimeZone = !showTimeZone }, enabled = !saving) {
@@ -166,11 +176,13 @@ internal fun NoteEditorScreen(
                     ErrorText(Res.string.reminder_future_required)
                 } else if (draft.cadence == RepeatCadence.WEEKLY && draft.weeklyDays.isEmpty()) {
                     ErrorText(Res.string.reminder_weekdays_required)
-                } else if (rule == null || occurrences.isEmpty()) {
+                } else if (endBeforeStart) {
+                    ErrorText(Res.string.reminder_end_before_start)
+                } else if (rule == null || !hasOccurrence) {
                     ErrorText(Res.string.reminder_invalid_rule)
                 }
             }
-            if (draft.cadence != RepeatCadence.ONCE && rule != null && occurrences.isNotEmpty()) {
+            if (draft.cadence != RepeatCadence.ONCE && rule != null && hasOccurrence) {
                 Panel(tinted = true) {
                     Text(
                         stringResource(Res.string.reminder_preview),
@@ -181,14 +193,18 @@ internal fun NoteEditorScreen(
                         stringResource(Res.string.reminder_preview_description, rule.zoneId),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    val upcoming = occurrences.filter { it.at >= now }
-                    if (upcoming.isEmpty()) Text(stringResource(Res.string.reminder_no_upcoming))
-                    upcoming.take(6).forEach { occurrence ->
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        Text(occurrenceLabel(occurrence, rule), style = MaterialTheme.typography.bodyLarge)
-                    }
-                    if (upcoming.size > 6) {
-                        Text(stringResource(Res.string.reminder_more_dates, upcoming.size - 6), style = MaterialTheme.typography.bodySmall)
+                    val upcoming = upcomingOccurrences(rule, now, limit = 7)
+                    if (upcoming == null) {
+                        CircularProgressIndicator(Modifier.size(20.dp))
+                    } else {
+                        if (upcoming.isEmpty()) Text(stringResource(Res.string.reminder_no_upcoming))
+                        upcoming.take(6).forEach { occurrence ->
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            Text(occurrenceLabel(occurrence, rule), style = MaterialTheme.typography.bodyLarge)
+                        }
+                        if (upcoming.size > 6) {
+                            Text(stringResource(Res.string.reminder_more_dates), style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }
