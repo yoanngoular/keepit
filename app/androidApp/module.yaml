@@ -2,6 +2,7 @@ product: android/app
 
 dependencies:
   - //app/shared
+  - $libs.androidx.sqlite.bundled
   - $libs.androidx.activity.compose
   - $compose.preview
   - $compose.uiTooling
@@ -9,5 +10,6 @@ dependencies:
 settings:
   compose: enabled
   android:
+    minSdk: 26
     namespace: com.ygoular.keepit
     applicationId: com.ygoular.keepit
