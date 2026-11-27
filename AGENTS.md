@@ -4,7 +4,7 @@ KeepIt is a Kotlin Multiplatform project. Use the repository's Kotlin Toolchain 
 
 ## Architecture
 
-- Group files by feature and responsibility. Keep theme definitions, screen composables, form state and validation, and domain models in distinct files.
+- Group packages and directories by feature and responsibility. Keep feature domain, storage, and presentation separate. Within presentation, put screens, components, form models, and formatting in their own packages as needed. Reusable themes belong in the shared design package.
 - Share domain behavior, UI, SQL schema, migrations, and repository logic across targets when supported by the current toolchain.
 - Prefer maintained open-source multiplatform libraries that have been verified with KeepIt. Keep database drivers and file paths, permissions, system alarms, and notification delivery in focused platform adapters.
 - Introduce common abstractions for dependencies the domain actually needs.
@@ -13,9 +13,17 @@ KeepIt is a Kotlin Multiplatform project. Use the repository's Kotlin Toolchain 
 ## Agent orchestration
 
 - Delegate repository research to exploration agents and delivery planning to planning agents.
-- Delegate implementation to agents with a model and reasoning effort calibrated to the complexity and risk of each task.
+- Default to the lightest capable model and low reasoning effort for bounded exploration, routine edits, and reviews. Escalate only when complexity or risk warrants it. Reserve heavyweight models and high effort for short, narrowly scoped problems where a lighter pass is insufficient.
 - Keep review agents independent from implementation and from one another.
 - The orchestrator assigns bounded tasks, integrates concise findings, verifies important results, and intervenes when needed. Ask agents to report conclusions and evidence without returning raw logs or duplicating repository context.
+
+
+## Preventing repeat regressions
+
+- Turn a reproducible defect or repeated review finding into the smallest check that would have caught it. Prefer a regression test or an executable check run by CI. Use project guidance for decisions that require judgment, and create a skill only for a repeated workflow that needs reusable instructions.
+- Verify a new check against both a valid case and a representative failure. Keep checks fast and avoid duplicating an existing check.
+- Run `pwsh -File scripts/check-package-layout.ps1` when changing Kotlin packages or Android component names.
+- Treat Android component names used in pending intents as persistent identities across upgrades. Keep the reminder receiver entry point stable and move its implementation behind it when refactoring.
 
 
 ## Commits and pull requests

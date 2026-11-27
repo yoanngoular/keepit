@@ -2,7 +2,6 @@ name: KeepIt checks
 
 on:
   pull_request:
-    branches: [master]
   push:
     branches: [master]
 
@@ -17,6 +16,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - name: Check Kotlin package layout
+        run: .\scripts\check-package-layout.ps1
       - name: Test shared code
         run: .\kotlin.bat test -m shared
       - name: Prepare Android SDK and accept its licenses
