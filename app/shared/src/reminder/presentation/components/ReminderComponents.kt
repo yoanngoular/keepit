@@ -1,4 +1,4 @@
-package com.ygoular.keepit.reminder
+package com.ygoular.keepit.reminder.presentation.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

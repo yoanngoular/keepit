@@ -1,13 +1,13 @@
-package com.ygoular.keepit
+package com.ygoular.keepit.reminder.platform
 
 import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
-import com.ygoular.keepit.reminder.ReminderDeliveryPolicy
-import com.ygoular.keepit.reminder.ReminderDeliveryPolicy.AlarmDecision
-import com.ygoular.keepit.reminder.ReminderNote
-import com.ygoular.keepit.reminder.ReminderStore
+import com.ygoular.keepit.reminder.domain.ReminderDeliveryPolicy
+import com.ygoular.keepit.reminder.domain.ReminderDeliveryPolicy.AlarmDecision
+import com.ygoular.keepit.reminder.domain.ReminderNote
+import com.ygoular.keepit.reminder.domain.ReminderStore
 import com.ygoular.keepit.reminder.storage.NoteDatabase
 import com.ygoular.keepit.reminder.storage.StoredNote
 import kotlinx.coroutines.CancellationException

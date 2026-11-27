@@ -1,4 +1,4 @@
-package com.ygoular.keepit
+package com.ygoular.keepit.reminder.platform
 
 import android.net.Uri
 

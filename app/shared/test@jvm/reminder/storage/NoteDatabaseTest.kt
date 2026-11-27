@@ -2,8 +2,8 @@ package com.ygoular.keepit.reminder.storage
 
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
-import com.ygoular.keepit.reminder.MonthlyReminderRule
-import com.ygoular.keepit.reminder.ReminderNote
+import com.ygoular.keepit.reminder.domain.MonthlyReminderRule
+import com.ygoular.keepit.reminder.domain.ReminderNote
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.DayOfWeek

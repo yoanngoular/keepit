@@ -1,4 +1,4 @@
-package com.ygoular.keepit.reminder
+package com.ygoular.keepit.reminder.presentation.model
 
 import androidx.compose.runtime.saveable.SaverScope
 import kotlin.test.Test

@@ -1,7 +1,7 @@
 package com.ygoular.keepit
 
-import android.Manifest
 import android.content.Intent
+import android.Manifest
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -17,7 +17,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
-import com.ygoular.keepit.reminder.ReminderApp
+import com.ygoular.keepit.reminder.platform.DeviceReminders
+import com.ygoular.keepit.reminder.platform.ReminderNotifications
+import com.ygoular.keepit.reminder.platform.ReminderRoute
+import com.ygoular.keepit.reminder.presentation.ReminderApp
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
