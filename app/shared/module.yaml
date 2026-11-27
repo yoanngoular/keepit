@@ -4,6 +4,7 @@ product:
 
 dependencies:
   - //core
+  - $libs.kotlinx.datetime: exported
   - $compose.runtime
   - $compose.foundation
   - $compose.material3
