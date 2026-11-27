@@ -1,6 +1,8 @@
-package com.ygoular.keepit.reminder
+package com.ygoular.keepit.reminder.presentation.model
 
 import androidx.compose.runtime.saveable.listSaver
+import com.ygoular.keepit.reminder.domain.MonthlyReminderRule
+import com.ygoular.keepit.reminder.domain.ReminderNote
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime

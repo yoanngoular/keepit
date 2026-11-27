@@ -1,4 +1,4 @@
-package com.ygoular.keepit.reminder
+package com.ygoular.keepit.design.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 @Composable
-internal fun ReminderTheme(content: @Composable () -> Unit) {
+internal fun KeepItTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = if (isSystemInDarkTheme()) darkColors else lightColors,
         content = content,

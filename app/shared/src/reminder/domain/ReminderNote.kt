@@ -1,4 +1,4 @@
-package com.ygoular.keepit.reminder
+package com.ygoular.keepit.reminder.domain
 
 data class ReminderNote(
     val id: String,

@@ -1,12 +1,12 @@
-package com.ygoular.keepit.reminder
+package com.ygoular.keepit.reminder.presentation.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -34,10 +34,18 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.ygoular.keepit.reminder.domain.ReminderNote
+import com.ygoular.keepit.reminder.presentation.components.ErrorText
+import com.ygoular.keepit.reminder.presentation.components.Headline
+import com.ygoular.keepit.reminder.presentation.components.Panel
+import com.ygoular.keepit.reminder.presentation.format.occurrenceLabel
+import com.ygoular.keepit.reminder.presentation.format.ordinalLabel
+import com.ygoular.keepit.reminder.presentation.format.weekdayLabel
+import com.ygoular.keepit.reminder.presentation.model.NoteDraft
 import com.ygoular.keepit.resources.*
 import kotlinx.datetime.DayOfWeek
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Instant
 
 @Composable

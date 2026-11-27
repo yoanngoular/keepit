@@ -1,4 +1,4 @@
-package com.ygoular.keepit.reminder
+package com.ygoular.keepit.reminder.domain
 
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.DayOfWeek

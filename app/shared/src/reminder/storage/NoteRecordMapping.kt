@@ -1,8 +1,8 @@
 package com.ygoular.keepit.reminder.storage
 
 import androidx.sqlite.SQLiteStatement
-import com.ygoular.keepit.reminder.MonthlyReminderRule
-import com.ygoular.keepit.reminder.ReminderNote
+import com.ygoular.keepit.reminder.domain.MonthlyReminderRule
+import com.ygoular.keepit.reminder.domain.ReminderNote
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime

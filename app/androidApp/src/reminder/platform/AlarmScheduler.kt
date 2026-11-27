@@ -1,11 +1,12 @@
-package com.ygoular.keepit
+package com.ygoular.keepit.reminder.platform
 
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import com.ygoular.keepit.reminder.ReminderOccurrence
+import com.ygoular.keepit.ReminderReceiver
+import com.ygoular.keepit.reminder.domain.ReminderOccurrence
 
 internal class AlarmScheduler(private val context: Context) {
     companion object {
