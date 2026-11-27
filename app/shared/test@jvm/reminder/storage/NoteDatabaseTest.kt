@@ -4,6 +4,7 @@ import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
 import com.ygoular.keepit.reminder.domain.MonthlyReminderRule
 import com.ygoular.keepit.reminder.domain.ReminderNote
+import com.ygoular.keepit.reminder.domain.WeeklyReminderRule
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.DayOfWeek
@@ -47,8 +48,7 @@ class NoteDatabaseTest {
         assertEquals(edited.copy(consumed = 2), db.find("first"))
     }
 
-    @Test
-    fun readsKeepItVersionOneIncludingPreviouslyConsumedOccurrences() = onDisk { path ->
+    private fun createVersionOne(path: String) {
         driver.open(path).use { connection ->
             connection.execSQL("""CREATE TABLE notes (
                 id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL,
@@ -56,11 +56,75 @@ class NoteDatabaseTest {
                 interval_months INTEGER NOT NULL, ordinal INTEGER NOT NULL, weekday TEXT NOT NULL,
                 occurrence_count INTEGER NOT NULL, revision TEXT NOT NULL, consumed INTEGER NOT NULL)""")
             connection.execSQL("""INSERT INTO notes VALUES (
-                'one', 'Title', 'Body', '2026-11-01', '08:30', 'Europe/Paris', 2, 3, 'TUESDAY', 9, 'revision', 4)""")
-            connection.execSQL("PRAGMA user_version=1")
+                'older', 'Title', 'Body', '2026-11-01', '08:30', 'Europe/Paris', 2, 3, 'TUESDAY', 9, 'revision', 4)""")
+            connection.execSQL("""INSERT INTO notes VALUES (
+                'newer', 'Latest', 'Description', '2026-12-15', '19:45', 'UTC', 5, 4, 'FRIDAY', 12, 'newer-revision', 2)""")
+            connection.execSQL("UPDATE notes SET rowid = 12 WHERE id = 'newer'")
+            connection.execSQL("PRAGMA user_version = 1")
         }
-        assertEquals(row("one").copy(consumed = 4), NoteDatabase(driver, path).find("one"))
     }
+
+    @Test
+    fun upgradesVersionOnePreservingNotesRuleFieldsProgressAndRowIds() = onDisk { path ->
+        createVersionOne(path)
+        val older = row("older").copy(consumed = 4)
+        val newerRule = MonthlyReminderRule(
+            LocalDate(2026, 12, 15), LocalTime(19, 45), "UTC", 5, 4, DayOfWeek.FRIDAY, 12,
+        )
+        val newer = StoredNote(ReminderNote("newer", "Latest", "Description", newerRule), "newer-revision", 2)
+
+        assertEquals(listOf(newer, older), NoteDatabase(driver, path).all())
+        driver.open(path).use { connection ->
+            connection.prepare("PRAGMA user_version").use { statement ->
+                statement.step()
+                assertEquals(2, statement.getInt(0))
+            }
+            connection.prepare("SELECT rowid FROM notes WHERE id = 'newer'").use { statement ->
+                statement.step()
+                assertEquals(12L, statement.getLong(0))
+            }
+        }
+    }
+
+    @Test
+    fun weeklyRuleRoundTripsAndCanReplaceAMonthlyRule() = onDisk { path ->
+        val db = NoteDatabase(driver, path)
+        val monthly = row("first")
+        val rule = WeeklyReminderRule(
+            LocalDate(2026, 11, 25), LocalTime(8, 30), "Europe/Paris", 2,
+            setOf(DayOfWeek.MONDAY, DayOfWeek.FRIDAY), 9,
+        )
+        val weekly = StoredNote(monthly.note.copy(rule = rule), "weekly-revision", 2)
+        db.save(monthly)
+        db.save(row("second"))
+        db.save(weekly)
+        val reopened = NoteDatabase(driver, path)
+        assertEquals(listOf(row("second"), weekly), reopened.all())
+        reopened.save(monthly)
+        assertEquals(monthly, db.find("first"))
+    }
+
+    @Test
+    fun failedVersionOneMigrationLeavesNotesAndVersionIntact() = onDisk { path ->
+        createVersionOne(path)
+        driver.open(path).use { it.execSQL("ALTER TABLE notes DROP COLUMN consumed") }
+        assertFailsWith<RuntimeException> { NoteDatabase(driver, path).all() }
+        driver.open(path).use { connection ->
+            connection.prepare("PRAGMA user_version").use { statement ->
+                statement.step()
+                assertEquals(1, statement.getInt(0))
+            }
+            connection.prepare("SELECT title FROM notes WHERE id = 'newer'").use { statement ->
+                statement.step()
+                assertEquals("Latest", statement.getText(0))
+            }
+            connection.prepare("SELECT count(*) FROM sqlite_master WHERE name = 'notes_v2'").use { statement ->
+                statement.step()
+                assertEquals(0, statement.getInt(0))
+            }
+        }
+    }
+
 
     @Test
     fun invalidRecordCanBeReportedWithoutBlockingOtherReminders() = onDisk { path ->

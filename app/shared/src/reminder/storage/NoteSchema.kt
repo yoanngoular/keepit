@@ -5,15 +5,34 @@ import androidx.sqlite.async.executeSQL
 import androidx.sqlite.async.prepare
 import androidx.sqlite.async.step
 
-private const val VERSION = 1
+private const val VERSION = 2
 
-private const val CREATE_NOTES = """CREATE TABLE notes (
+private fun createNotes(table: String) = """CREATE TABLE $table (
     id TEXT PRIMARY KEY NOT NULL,
     title TEXT NOT NULL, description TEXT NOT NULL,
     start_date TEXT NOT NULL, local_time TEXT NOT NULL, zone_id TEXT NOT NULL,
-    interval_months INTEGER NOT NULL, ordinal INTEGER NOT NULL,
-    weekday TEXT NOT NULL, occurrence_count INTEGER NOT NULL,
-    revision TEXT NOT NULL, consumed INTEGER NOT NULL)"""
+    interval_months INTEGER, ordinal INTEGER, weekday TEXT,
+    occurrence_count INTEGER NOT NULL, revision TEXT NOT NULL, consumed INTEGER NOT NULL,
+    rule_kind TEXT NOT NULL, interval_weeks INTEGER, weekdays TEXT,
+    CHECK (
+        (rule_kind = 'monthly' AND interval_months IS NOT NULL AND ordinal IS NOT NULL AND weekday IS NOT NULL
+            AND interval_weeks IS NULL AND weekdays IS NULL)
+        OR
+        (rule_kind = 'weekly' AND interval_months IS NULL AND ordinal IS NULL AND weekday IS NULL
+            AND interval_weeks IS NOT NULL AND weekdays IS NOT NULL)
+    ))"""
+
+private suspend fun SQLiteConnection.migrateFromVersionOne() {
+    executeSQL(createNotes("notes_v2"))
+    executeSQL(
+        """INSERT INTO notes_v2 (rowid, $NOTE_COLUMNS)
+            SELECT rowid, id, title, description, start_date, local_time, zone_id,
+                interval_months, ordinal, weekday, occurrence_count, revision, consumed,
+                'monthly', NULL, NULL FROM notes"""
+    )
+    executeSQL("DROP TABLE notes")
+    executeSQL("ALTER TABLE notes_v2 RENAME TO notes")
+}
 
 private suspend fun SQLiteConnection.version(): Int =
     prepare("PRAGMA user_version").use { statement ->
@@ -26,14 +45,13 @@ internal suspend fun SQLiteConnection.ensureNoteSchema() {
     executeSQL("BEGIN IMMEDIATE")
     try {
         when (val current = version()) {
-            // Another connection may have created the schema while we waited for the lock.
+            // Another connection may have migrated the schema while we waited for the lock.
             VERSION -> Unit
-            0 -> {
-                executeSQL(CREATE_NOTES)
-                executeSQL("PRAGMA user_version = $VERSION")
-            }
+            0 -> executeSQL(createNotes("notes"))
+            1 -> migrateFromVersionOne()
             else -> error("Missing KeepIt migration from $current to $VERSION")
         }
+        executeSQL("PRAGMA user_version = $VERSION")
         executeSQL("COMMIT")
     } catch (failure: Throwable) {
         if (inTransaction()) executeSQL("ROLLBACK")

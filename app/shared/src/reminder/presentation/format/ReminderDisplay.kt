@@ -1,7 +1,7 @@
 package com.ygoular.keepit.reminder.presentation.format
 
 import androidx.compose.runtime.Composable
-import com.ygoular.keepit.reminder.domain.MonthlyReminderRule
+import com.ygoular.keepit.reminder.domain.ReminderRule
 import com.ygoular.keepit.reminder.domain.ReminderOccurrence
 import com.ygoular.keepit.resources.*
 import kotlinx.datetime.DayOfWeek
@@ -11,7 +11,7 @@ import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-internal fun occurrenceLabel(occurrence: ReminderOccurrence, rule: MonthlyReminderRule): String {
+internal fun occurrenceLabel(occurrence: ReminderOccurrence, rule: ReminderRule): String {
     val local = occurrence.at.toLocalDateTime(TimeZone.of(rule.zoneId))
     return stringResource(
         Res.string.reminder_occurrence_date,

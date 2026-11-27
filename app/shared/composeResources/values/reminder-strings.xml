@@ -27,6 +27,12 @@
     <string name="reminder_description">Details</string>
     <string name="reminder_content_hint">Enter a title or add details.</string>
     <string name="reminder_repeat">Recurrence</string>
+    <string name="reminder_frequency">Frequency</string>
+    <string name="reminder_monthly">Monthly</string>
+    <string name="reminder_weekly">Weekly</string>
+    <string name="reminder_interval_weeks">Repeat every N weeks</string>
+    <string name="reminder_weekdays">Days of the week</string>
+    <string name="reminder_weekdays_required">Select at least one day of the week.</string>
     <string name="reminder_start_date">Start date</string>
     <string name="reminder_date_hint">YYYY-MM-DD</string>
     <string name="reminder_time">Time</string>
