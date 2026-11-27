@@ -4,6 +4,8 @@ product:
 
 dependencies:
   - //core
+  - $libs.androidx.sqlite.api: exported
+  - $libs.androidx.sqlite.async
   - $libs.kotlinx.datetime: exported
   - $compose.runtime
   - $compose.foundation
@@ -17,6 +19,9 @@ dependencies:
 
 dependencies@android:
   - $compose.uiTooling
+
+test-dependencies@jvm:
+  - $libs.androidx.sqlite.bundled
 
 settings:
   compose:
