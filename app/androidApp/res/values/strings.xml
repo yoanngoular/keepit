@@ -1,3 +1,7 @@
 <resources>
-    <string name="app_name">Keepit</string>
+    <string name="app_name">KeepIt</string>
+    <string name="reminder_channel">Reminders</string>
+    <string name="notifications_off">Notifications are off. Your reminders are saved.</string>
+    <string name="alarms_approximate">Android may deliver reminders later than scheduled.</string>
+    <string name="scheduling_unavailable">Reminder scheduling is unavailable. Reopen KeepIt to retry.</string>
 </resources>

@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">KeepIt</string>
+    <string name="reminder_channel">Rappels</string>
+    <string name="notifications_off">Les notifications sont désactivées. Vos rappels sont enregistrés.</string>
+    <string name="alarms_approximate">Android peut afficher vos rappels après l’heure prévue.</string>
+    <string name="scheduling_unavailable">La programmation des rappels est indisponible. Rouvrez KeepIt pour réessayer.</string>
+</resources>
