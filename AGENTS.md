@@ -16,6 +16,7 @@ KeepIt is a Kotlin Multiplatform project. Use the repository's Kotlin Toolchain 
 - Default to the lightest capable model and low reasoning effort for bounded exploration, routine edits, and reviews. Escalate only when complexity or risk warrants it. Reserve heavyweight models and high effort for short, narrowly scoped problems where a lighter pass is insufficient.
 - Keep review agents independent from implementation and from one another.
 - The orchestrator assigns bounded tasks, integrates concise findings, verifies important results, and intervenes when needed. Ask agents to report conclusions and evidence without returning raw logs or duplicating repository context.
+- Poll GitHub workflow jobs at most once every five minutes per run. Use the time between checks for independent work.
 
 
 ## Preventing repeat regressions
