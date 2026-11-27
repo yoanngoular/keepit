@@ -3,6 +3,8 @@ package com.ygoular.keepit.reminder.presentation.model
 import androidx.compose.runtime.saveable.listSaver
 import com.ygoular.keepit.reminder.domain.MonthlyReminderRule
 import com.ygoular.keepit.reminder.domain.ReminderNote
+import com.ygoular.keepit.reminder.domain.ReminderRule
+import com.ygoular.keepit.reminder.domain.WeeklyReminderRule
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
@@ -24,22 +26,37 @@ internal data class NoteDraft(
     val ordinal: Int,
     val weekday: DayOfWeek,
     val count: String,
+    val cadence: RepeatCadence = RepeatCadence.MONTHLY,
+    val intervalWeeks: String = "1",
+    val weeklyDays: Set<DayOfWeek> = setOf(DayOfWeek.MONDAY),
 ) {
-    fun parseRule(): MonthlyReminderRule? = runCatching {
+    fun parseRule(): ReminderRule? = runCatching {
         val parsedDate = LocalDate.parse(date.trim())
         require(parsedDate.year in 1..9999)
-        MonthlyReminderRule(
-            startDate = parsedDate,
-            time = LocalTime.parse(time.trim()),
-            zoneId = zoneId.trim(),
-            intervalMonths = interval.trim().toInt(),
-            ordinal = ordinal,
-            weekday = weekday,
-            count = count.trim().toInt(),
-        )
+        val parsedTime = LocalTime.parse(time.trim())
+        val parsedCount = count.trim().toInt()
+        when (cadence) {
+            RepeatCadence.MONTHLY -> MonthlyReminderRule(
+                startDate = parsedDate,
+                time = parsedTime,
+                zoneId = zoneId.trim(),
+                intervalMonths = interval.trim().toInt(),
+                ordinal = ordinal,
+                weekday = weekday,
+                count = parsedCount,
+            )
+            RepeatCadence.WEEKLY -> WeeklyReminderRule(
+                startDate = parsedDate,
+                time = parsedTime,
+                zoneId = zoneId.trim(),
+                intervalWeeks = intervalWeeks.trim().toInt(),
+                weekdays = weeklyDays,
+                count = parsedCount,
+            )
+        }
     }.getOrNull()
 
-    fun toNote(rule: MonthlyReminderRule): ReminderNote = ReminderNote(
+    fun toNote(rule: ReminderRule): ReminderNote = ReminderNote(
         id = id,
         title = title.trim(),
         description = description.trim(),
@@ -50,7 +67,10 @@ internal data class NoteDraft(
         val saver = listSaver<NoteDraft?, String>(
             save = { draft ->
                 draft?.run {
-                    listOf(id, title, description, date, time, zoneId, interval, ordinal.toString(), weekday.name, count, isNew.toString())
+                    listOf(
+                        id, title, description, date, time, zoneId, interval, ordinal.toString(), weekday.name,
+                        count, isNew.toString(), cadence.name, intervalWeeks, weeklyDays.joinToString(",") { it.name },
+                    )
                 }.orEmpty()
             },
             restore = { values ->
@@ -66,6 +86,10 @@ internal data class NoteDraft(
                     weekday = DayOfWeek.valueOf(values[8]),
                     count = values[9],
                     isNew = values[10].toBooleanStrict(),
+                    cadence = values.getOrNull(11)?.let(RepeatCadence::valueOf) ?: RepeatCadence.MONTHLY,
+                    intervalWeeks = values.getOrNull(12) ?: "1",
+                    weeklyDays = values.getOrNull(13)?.split(',')?.filter(String::isNotEmpty)
+                        ?.map(DayOfWeek::valueOf)?.toSet() ?: setOf(DayOfWeek.MONDAY),
                 )
             },
         )
@@ -88,20 +112,33 @@ internal data class NoteDraft(
             )
         }
 
-        fun fromNote(note: ReminderNote): NoteDraft = with(note.rule) {
-            NoteDraft(
+        fun fromNote(note: ReminderNote): NoteDraft {
+            val rule = note.rule
+            val draft = NoteDraft(
                 id = note.id,
                 isNew = false,
                 title = note.title,
                 description = note.description,
-                date = startDate.toString(),
-                time = time.toString(),
-                zoneId = zoneId,
-                interval = intervalMonths.toString(),
-                ordinal = ordinal,
-                weekday = weekday,
-                count = count.toString(),
+                date = rule.startDate.toString(),
+                time = rule.time.toString(),
+                zoneId = rule.zoneId,
+                interval = "2",
+                ordinal = 2,
+                weekday = DayOfWeek.TUESDAY,
+                count = rule.count.toString(),
             )
+            return when (rule) {
+                is MonthlyReminderRule -> draft.copy(
+                    interval = rule.intervalMonths.toString(),
+                    ordinal = rule.ordinal,
+                    weekday = rule.weekday,
+                )
+                is WeeklyReminderRule -> draft.copy(
+                    cadence = RepeatCadence.WEEKLY,
+                    intervalWeeks = rule.intervalWeeks.toString(),
+                    weeklyDays = rule.weekdays,
+                )
+            }
         }
     }
 }

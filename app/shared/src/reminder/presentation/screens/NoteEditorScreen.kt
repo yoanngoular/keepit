@@ -38,10 +38,12 @@ import com.ygoular.keepit.reminder.domain.ReminderNote
 import com.ygoular.keepit.reminder.presentation.components.ErrorText
 import com.ygoular.keepit.reminder.presentation.components.Headline
 import com.ygoular.keepit.reminder.presentation.components.Panel
+import com.ygoular.keepit.reminder.presentation.components.WeeklyDayPicker
 import com.ygoular.keepit.reminder.presentation.format.occurrenceLabel
 import com.ygoular.keepit.reminder.presentation.format.ordinalLabel
 import com.ygoular.keepit.reminder.presentation.format.weekdayLabel
 import com.ygoular.keepit.reminder.presentation.model.NoteDraft
+import com.ygoular.keepit.reminder.presentation.model.RepeatCadence
 import com.ygoular.keepit.resources.*
 import kotlinx.datetime.DayOfWeek
 import org.jetbrains.compose.resources.stringResource
@@ -59,7 +61,10 @@ internal fun NoteEditorScreen(
     onDelete: () -> Unit,
     onSave: (ReminderNote) -> Unit,
 ) {
-    val rule = remember(draft.date, draft.time, draft.zoneId, draft.interval, draft.ordinal, draft.weekday, draft.count) {
+    val rule = remember(
+        draft.date, draft.time, draft.zoneId, draft.interval, draft.ordinal, draft.weekday, draft.count,
+        draft.cadence, draft.intervalWeeks, draft.weeklyDays,
+    ) {
         draft.parseRule()
     }
     val occurrences = remember(rule) { rule?.let { runCatching(it::occurrences).getOrNull() }.orEmpty() }
@@ -115,25 +120,39 @@ internal fun NoteEditorScreen(
                     )
                 }
                 Field(Res.string.reminder_zone, draft.zoneId, { onChange(draft.copy(zoneId = it)) }, enabled = !saving)
-                Field(Res.string.reminder_interval, draft.interval, { onChange(draft.copy(interval = it)) }, enabled = !saving, numeric = true)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    val ordinals = (1..5).map { ordinalLabel(it) }
-                    Choice(
-                        Res.string.reminder_ordinal, ordinals, draft.ordinal - 1,
-                        onChoose = { onChange(draft.copy(ordinal = it + 1)) },
-                        enabled = !saving,
-                        modifier = Modifier.weight(1f),
-                    )
-                    val weekdays = DayOfWeek.entries.map { weekdayLabel(it) }
-                    Choice(
-                        Res.string.reminder_weekday, weekdays, draft.weekday.ordinal,
-                        onChoose = { onChange(draft.copy(weekday = DayOfWeek.entries[it])) },
-                        enabled = !saving,
-                        modifier = Modifier.weight(1f),
-                    )
+                Choice(
+                    label = Res.string.reminder_frequency,
+                    options = listOf(
+                        stringResource(Res.string.reminder_monthly),
+                        stringResource(Res.string.reminder_weekly),
+                    ),
+                    selected = draft.cadence.ordinal,
+                    onChoose = { onChange(draft.copy(cadence = RepeatCadence.entries[it])) },
+                    enabled = !saving,
+                )
+                when (draft.cadence) {
+                    RepeatCadence.MONTHLY -> MonthlySettings(draft, onChange, enabled = !saving)
+                    RepeatCadence.WEEKLY -> {
+                        Field(
+                            Res.string.reminder_interval_weeks, draft.intervalWeeks,
+                            { onChange(draft.copy(intervalWeeks = it)) }, enabled = !saving, numeric = true,
+                        )
+                        WeeklyDayPicker(
+                            selected = draft.weeklyDays,
+                            onToggle = { day ->
+                                val days = if (day in draft.weeklyDays) draft.weeklyDays - day else draft.weeklyDays + day
+                                onChange(draft.copy(weeklyDays = days))
+                            },
+                            enabled = !saving,
+                        )
+                    }
                 }
                 Field(Res.string.reminder_count, draft.count, { onChange(draft.copy(count = it)) }, enabled = !saving, numeric = true)
-                if (rule == null || occurrences.isEmpty()) ErrorText(Res.string.reminder_invalid_rule)
+                if (draft.cadence == RepeatCadence.WEEKLY && draft.weeklyDays.isEmpty()) {
+                    ErrorText(Res.string.reminder_weekdays_required)
+                } else if (rule == null || occurrences.isEmpty()) {
+                    ErrorText(Res.string.reminder_invalid_rule)
+                }
             }
             if (rule != null && occurrences.isNotEmpty()) {
                 Panel(tinted = true) {
@@ -169,6 +188,30 @@ internal fun NoteEditorScreen(
                 Text(stringResource(if (saving) Res.string.reminder_saving else Res.string.reminder_save))
             }
         }
+    }
+}
+
+@Composable
+private fun MonthlySettings(draft: NoteDraft, onChange: (NoteDraft) -> Unit, enabled: Boolean) {
+    Field(
+        Res.string.reminder_interval, draft.interval, { onChange(draft.copy(interval = it)) },
+        enabled = enabled, numeric = true,
+    )
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        val ordinals = (1..5).map { ordinalLabel(it) }
+        Choice(
+            Res.string.reminder_ordinal, ordinals, draft.ordinal - 1,
+            onChoose = { onChange(draft.copy(ordinal = it + 1)) },
+            enabled = enabled,
+            modifier = Modifier.weight(1f),
+        )
+        val weekdays = DayOfWeek.entries.map { weekdayLabel(it) }
+        Choice(
+            Res.string.reminder_weekday, weekdays, draft.weekday.ordinal,
+            onChoose = { onChange(draft.copy(weekday = DayOfWeek.entries[it])) },
+            enabled = enabled,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
