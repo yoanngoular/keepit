@@ -31,6 +31,16 @@
     <string name="reminder_repeat_off">Off</string>
     <string name="reminder_monthly">Monthly</string>
     <string name="reminder_weekly">Weekly</string>
+    <string name="reminder_daily">Daily</string>
+    <string name="reminder_yearly">Yearly</string>
+    <string name="reminder_interval_days">Repeat every N days</string>
+    <string name="reminder_interval_years">Repeat every N years</string>
+    <string name="reminder_monthly_pattern">Monthly pattern</string>
+    <string name="reminder_monthly_by_weekday">Weekday in the month</string>
+    <string name="reminder_monthly_by_day">Day of the month</string>
+    <string name="reminder_day_of_month">Day of the month (1–31)</string>
+    <string name="reminder_short_month_hint">Shorter months use their last day.</string>
+    <string name="reminder_leap_day_hint">In years without February 29, the reminder falls on February 28.</string>
     <string name="reminder_interval_weeks">Repeat every N weeks</string>
     <string name="reminder_weekdays">Days of the week</string>
     <string name="reminder_weekdays_required">Select at least one day of the week.</string>
@@ -78,4 +88,5 @@
     <string name="reminder_third">Third</string>
     <string name="reminder_fourth">Fourth</string>
     <string name="reminder_fifth">Fifth</string>
+    <string name="reminder_last">Last</string>
 </resources>

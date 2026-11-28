@@ -6,6 +6,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.yearMonth
 
 data class MonthlyReminderRule(
     override val startDate: LocalDate,
@@ -20,7 +21,7 @@ data class MonthlyReminderRule(
 
     init {
         require(intervalMonths in 1..120) { "Month interval must be between 1 and 120." }
-        require(ordinal in 1..5) { "Weekday ordinal must be between 1 and 5." }
+        require(ordinal == LAST || ordinal in 1..5) { "Weekday ordinal must be between 1 and 5 or last." }
         require(endDate == null || endDate >= startDate) { "End date must not be before the start date." }
         zone = TimeZone.of(zoneId)
     }
@@ -31,7 +32,7 @@ data class MonthlyReminderRule(
         val dates = if (ordinal == 5) {
             scheduledDates().drop(after)
         } else {
-            // The first four ordinals exist in every month. Only the start month can be partial.
+            // The first four ordinals and last weekday exist in every month.
             val startMonth = LocalDate(startDate.year, startDate.month, 1)
             val firstMonthIndex = if (checkNotNull(dateIn(startMonth)) < startDate) 1 else 0
             datesFromMonth(startMonth, after.toLong() + firstMonthIndex)
@@ -43,6 +44,11 @@ data class MonthlyReminderRule(
         datesFromMonth(LocalDate(startDate.year, startDate.month, 1), 0)
 
     private fun dateIn(month: LocalDate): LocalDate? {
+        if (ordinal == LAST) {
+            val lastDay = month.yearMonth.lastDay
+            val offset = (lastDay.dayOfWeek.isoDayNumber - weekday.isoDayNumber + 7) % 7
+            return lastDay.advanceOrNull(-offset.toLong(), DateTimeUnit.DAY)
+        }
         val firstMatch = (weekday.isoDayNumber - month.dayOfWeek.isoDayNumber + 7) % 7
         return month.advanceOrNull((firstMatch + (ordinal - 1) * 7).toLong(), DateTimeUnit.DAY)
             ?.takeIf { it.month == month.month }
@@ -65,5 +71,9 @@ data class MonthlyReminderRule(
                 (month.year - startMonth.year) % 400 == 0
             ) break
         }
+    }
+
+    companion object {
+        const val LAST = -1
     }
 }

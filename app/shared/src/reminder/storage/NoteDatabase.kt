@@ -53,7 +53,9 @@ class NoteDatabase(private val driver: SQLiteDriver, private val path: String) {
                     interval_months = excluded.interval_months, ordinal = excluded.ordinal,
                     weekday = excluded.weekday, end_date = excluded.end_date,
                     revision = excluded.revision, consumed = excluded.consumed,
-                    rule_kind = excluded.rule_kind, interval_weeks = excluded.interval_weeks, weekdays = excluded.weekdays"""
+                    rule_kind = excluded.rule_kind, interval_weeks = excluded.interval_weeks, weekdays = excluded.weekdays,
+                    interval_days = excluded.interval_days, interval_years = excluded.interval_years,
+                    day_of_month = excluded.day_of_month"""
             ).use { statement ->
                 statement.bindStoredNote(row)
                 statement.step()

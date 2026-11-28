@@ -1,6 +1,7 @@
 package com.ygoular.keepit.reminder.presentation.format
 
 import androidx.compose.runtime.Composable
+import com.ygoular.keepit.reminder.domain.MonthlyReminderRule
 import com.ygoular.keepit.reminder.domain.ReminderRule
 import com.ygoular.keepit.reminder.domain.ReminderOccurrence
 import com.ygoular.keepit.resources.*
@@ -36,7 +37,9 @@ internal fun weekdayLabel(weekday: DayOfWeek): String = stringResource(weekdayLa
 private fun monthLabel(index: Int): String = stringResource(monthLabels[index])
 
 @Composable
-internal fun ordinalLabel(ordinal: Int): String = stringResource(ordinalLabels[ordinal - 1])
+internal fun ordinalLabel(ordinal: Int): String = stringResource(
+    if (ordinal == MonthlyReminderRule.LAST) Res.string.reminder_last else ordinalLabels[ordinal - 1],
+)
 
 private val weekdayLabels = listOf(
     Res.string.reminder_monday, Res.string.reminder_tuesday, Res.string.reminder_wednesday,

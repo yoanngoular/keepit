@@ -31,6 +31,16 @@
     <string name="reminder_repeat_off">Désactivé</string>
     <string name="reminder_monthly">Mensuelle</string>
     <string name="reminder_weekly">Hebdomadaire</string>
+    <string name="reminder_daily">Quotidienne</string>
+    <string name="reminder_yearly">Annuelle</string>
+    <string name="reminder_interval_days">Répéter tous les N jours</string>
+    <string name="reminder_interval_years">Répéter tous les N ans</string>
+    <string name="reminder_monthly_pattern">Règle mensuelle</string>
+    <string name="reminder_monthly_by_weekday">Jour de la semaine dans le mois</string>
+    <string name="reminder_monthly_by_day">Jour du mois</string>
+    <string name="reminder_day_of_month">Jour du mois (1–31)</string>
+    <string name="reminder_short_month_hint">Dans les mois plus courts, le rappel tombe le dernier jour du mois.</string>
+    <string name="reminder_leap_day_hint">Les années sans 29 février, le rappel tombe le 28 février.</string>
     <string name="reminder_interval_weeks">Répéter toutes les N semaines</string>
     <string name="reminder_weekdays">Jours de la semaine</string>
     <string name="reminder_weekdays_required">Sélectionnez au moins un jour de la semaine.</string>
@@ -78,4 +88,5 @@
     <string name="reminder_third">Troisième</string>
     <string name="reminder_fourth">Quatrième</string>
     <string name="reminder_fifth">Cinquième</string>
+    <string name="reminder_last">Dernier</string>
 </resources>

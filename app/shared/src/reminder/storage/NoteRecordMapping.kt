@@ -1,19 +1,23 @@
 package com.ygoular.keepit.reminder.storage
 
 import androidx.sqlite.SQLiteStatement
+import com.ygoular.keepit.reminder.domain.DailyReminderRule
+import com.ygoular.keepit.reminder.domain.MonthlyDayReminderRule
 import com.ygoular.keepit.reminder.domain.MonthlyReminderRule
 import com.ygoular.keepit.reminder.domain.OneTimeReminderRule
 import com.ygoular.keepit.reminder.domain.ReminderNote
 import com.ygoular.keepit.reminder.domain.WeeklyReminderRule
+import com.ygoular.keepit.reminder.domain.YearlyReminderRule
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.isoDayNumber
 
 internal const val NOTE_COLUMNS = """id, title, description, start_date, local_time, zone_id,
-    interval_months, ordinal, weekday, end_date, revision, consumed, rule_kind, interval_weeks, weekdays"""
+    interval_months, ordinal, weekday, end_date, revision, consumed, rule_kind, interval_weeks, weekdays,
+    interval_days, interval_years, day_of_month"""
 
-internal const val NOTE_VALUES = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?"
+internal const val NOTE_VALUES = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?"
 
 internal fun SQLiteStatement.readStoredNote(): StoredNote {
     val date = LocalDate.parse(getText(3))
@@ -28,6 +32,9 @@ internal fun SQLiteStatement.readStoredNote(): StoredNote {
             endDate,
         )
         "once" -> OneTimeReminderRule(date, time, zone)
+        "daily" -> DailyReminderRule(date, time, zone, getInt(15), endDate)
+        "yearly" -> YearlyReminderRule(date, time, zone, getInt(16), endDate)
+        "monthly_day" -> MonthlyDayReminderRule(date, time, zone, getInt(6), getInt(17), endDate)
         else -> error("Unknown stored reminder rule kind: $kind")
     }
     return StoredNote(ReminderNote(getText(0), getText(1), getText(2), rule), getText(10), getInt(11))
@@ -44,37 +51,45 @@ internal fun SQLiteStatement.bindStoredNote(row: StoredNote) {
     bindText(6, rule.zoneId)
     bindText(11, row.revision)
     bindInt(12, row.consumed)
-    when (rule) {
+
+    // Clear all optional fields when reusing a statement or replacing a different cadence.
+    for (index in 7..10) bindNull(index)
+    for (index in 14..18) bindNull(index)
+    val kind = when (rule) {
         is MonthlyReminderRule -> {
             bindInt(7, rule.intervalMonths)
             bindInt(8, rule.ordinal)
             bindText(9, rule.weekday.name)
             bindEndDate(rule.endDate)
-            bindText(13, "monthly")
-            bindNull(14)
-            bindNull(15)
+            "monthly"
         }
-        is OneTimeReminderRule -> {
-            bindNull(7)
-            bindNull(8)
-            bindNull(9)
-            bindNull(10)
-            bindText(13, "once")
-            bindNull(14)
-            bindNull(15)
-        }
+        is OneTimeReminderRule -> "once"
         is WeeklyReminderRule -> {
-            bindNull(7)
-            bindNull(8)
-            bindNull(9)
             bindEndDate(rule.endDate)
-            bindText(13, "weekly")
             bindInt(14, rule.intervalWeeks)
             bindText(15, rule.weekdays.sortedBy { it.isoDayNumber }.joinToString(",") { it.name })
+            "weekly"
+        }
+        is DailyReminderRule -> {
+            bindEndDate(rule.endDate)
+            bindInt(16, rule.intervalDays)
+            "daily"
+        }
+        is YearlyReminderRule -> {
+            bindEndDate(rule.endDate)
+            bindInt(17, rule.intervalYears)
+            "yearly"
+        }
+        is MonthlyDayReminderRule -> {
+            bindInt(7, rule.intervalMonths)
+            bindEndDate(rule.endDate)
+            bindInt(18, rule.dayOfMonth)
+            "monthly_day"
         }
     }
+    bindText(13, kind)
 }
 
 private fun SQLiteStatement.bindEndDate(value: LocalDate?) {
-    if (value == null) bindNull(10) else bindText(10, value.toString())
+    if (value != null) bindText(10, value.toString())
 }

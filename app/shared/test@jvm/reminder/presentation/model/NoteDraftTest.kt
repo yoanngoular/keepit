@@ -1,9 +1,12 @@
 package com.ygoular.keepit.reminder.presentation.model
 
 import androidx.compose.runtime.saveable.SaverScope
+import com.ygoular.keepit.reminder.domain.DailyReminderRule
+import com.ygoular.keepit.reminder.domain.MonthlyDayReminderRule
 import com.ygoular.keepit.reminder.domain.MonthlyReminderRule
 import com.ygoular.keepit.reminder.domain.OneTimeReminderRule
 import com.ygoular.keepit.reminder.domain.WeeklyReminderRule
+import com.ygoular.keepit.reminder.domain.YearlyReminderRule
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
@@ -17,6 +20,33 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 class NoteDraftTest {
+    @Test
+    fun `new cadence options keep their settings after draft restoration and note reopening`() {
+        val base = NoteDraft.new().copy(
+            zoneId = "UTC", date = "2026-12-01", endDate = LocalDate(2028, 12, 31),
+        )
+        val daily = base.copy(cadence = RepeatCadence.DAILY, intervalDays = "3")
+        val yearly = base.copy(cadence = RepeatCadence.YEARLY, intervalYears = "2")
+        val monthlyDay = base.copy(
+            cadence = RepeatCadence.MONTHLY, monthlyPattern = MonthlyPattern.DAY_OF_MONTH, dayOfMonth = "31",
+        )
+        val lastWeekday = base.copy(cadence = RepeatCadence.MONTHLY, ordinal = MonthlyReminderRule.LAST)
+
+        for (draft in listOf(daily, yearly, monthlyDay, lastWeekday)) {
+            val rule = assertNotNull(draft.parseRule())
+            val saved = with(NoteDraft.saver) { assertNotNull(SaverScope { true }.save(draft)) }
+            val restored = assertNotNull(NoteDraft.saver.restore(saved))
+            assertEquals(draft, restored)
+            assertEquals(rule, restored.parseRule())
+            assertEquals(rule, NoteDraft.fromNote(draft.toNote(rule)).parseRule())
+        }
+        assertEquals(3, assertIs<DailyReminderRule>(daily.parseRule()).intervalDays)
+        assertEquals(2, assertIs<YearlyReminderRule>(yearly.parseRule()).intervalYears)
+        assertEquals(31, assertIs<MonthlyDayReminderRule>(monthlyDay.parseRule()).dayOfMonth)
+        assertEquals(MonthlyReminderRule.LAST, assertIs<MonthlyReminderRule>(lastWeekday.parseRule()).ordinal)
+        assertNull(monthlyDay.copy(dayOfMonth = "32").parseRule())
+    }
+
     @Test
     fun `default schedule remains upcoming during the repeated autumn hour`() {
         val now = Instant.parse("2026-10-25T00:30:00Z")

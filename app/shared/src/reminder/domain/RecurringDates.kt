@@ -23,3 +23,21 @@ internal fun Sequence<LocalDate>.toOccurrences(
 ): Sequence<ReminderOccurrence> = take(Int.MAX_VALUE - after).mapIndexed { index, date ->
     ReminderOccurrence(after + index + 1, LocalDateTime(date, time).toInstant(zone))
 }
+
+/** Resolve each calendar position from the original anchor so clamping never shifts later dates. */
+internal fun LocalDate.anchoredDates(
+    firstIndex: Long,
+    interval: Int,
+    unit: DateTimeUnit.DateBased,
+    endDate: LocalDate?,
+    dateInPeriod: (LocalDate) -> LocalDate = { it },
+): Sequence<LocalDate> = sequence {
+    var index = firstIndex
+    while (true) {
+        val period = advanceOrNull(index * interval, unit) ?: break
+        val date = dateInPeriod(period)
+        if (endDate != null && date > endDate) break
+        yield(date)
+        index++
+    }
+}
