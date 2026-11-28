@@ -4,7 +4,7 @@
     <string name="reminder_new_note">New note</string>
     <string name="reminder_enable_notifications">Notification settings</string>
     <string name="reminder_empty_title">Remember what matters</string>
-    <string name="reminder_empty_body">Create a note and choose when KeepIt should remind you.</string>
+    <string name="reminder_empty_body">Create a note and add a reminder if you need one.</string>
     <string name="reminder_no_upcoming">No upcoming reminders</string>
     <string name="reminder_next">Next reminder · %1$s</string>
     <string name="reminder_load_failed">Could not load your notes.</string>
@@ -27,6 +27,8 @@
     <string name="reminder_description">Details</string>
     <string name="reminder_content_hint">Enter a title or add details.</string>
     <string name="reminder_schedule">Reminder</string>
+    <string name="reminder_add">Add reminder</string>
+    <string name="reminder_remove">Remove reminder</string>
     <string name="reminder_repeat">Repeat</string>
     <string name="reminder_repeat_off">Off</string>
     <string name="reminder_monthly">Monthly</string>

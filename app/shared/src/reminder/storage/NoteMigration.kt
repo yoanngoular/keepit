@@ -19,10 +19,12 @@ private const val LEGACY_COLUMNS = """id, title, description, start_date, local_
 private const val VERSION_FOUR_COLUMNS = """id, title, description, start_date, local_time, zone_id,
     interval_months, ordinal, weekday, end_date, revision, consumed, rule_kind, interval_weeks, weekdays"""
 
+private const val VERSION_FIVE_COLUMNS = "id, title, description, $REMINDER_COLUMNS"
+
 internal suspend fun SQLiteConnection.copyLegacyNotes(version: Int) {
     if (version == 4) {
         executeSQL(
-            """INSERT INTO notes_v5 (rowid, $NOTE_COLUMNS)
+            """INSERT INTO notes_v5 (rowid, $VERSION_FIVE_COLUMNS)
                 SELECT rowid, $VERSION_FOUR_COLUMNS, NULL, NULL, NULL FROM notes"""
         )
         return
@@ -33,9 +35,13 @@ internal suspend fun SQLiteConnection.copyLegacyNotes(version: Int) {
         else -> error("Unsupported KeepIt schema version: $version")
     }
     prepare("SELECT $LEGACY_COLUMNS, $legacyRuleColumns, rowid FROM notes").use { source ->
-        prepare("INSERT INTO notes_v5 ($NOTE_COLUMNS, rowid) VALUES ($NOTE_VALUES, ?)").use { target ->
+        prepare("INSERT INTO notes_v5 ($VERSION_FIVE_COLUMNS, rowid) VALUES (?, ?, ?, $REMINDER_VALUES, ?)").use { target ->
             while (source.step()) {
-                target.bindStoredNote(source.readLegacyNote())
+                val row = source.readLegacyNote()
+                target.bindText(1, row.note.id)
+                target.bindText(2, row.note.title)
+                target.bindText(3, row.note.description)
+                target.bindReminderDetails(checkNotNull(row.note.rule), checkNotNull(row.revision), row.consumed, offset = 3)
                 target.bindLong(19, source.getLong(15))
                 target.step()
                 target.reset()

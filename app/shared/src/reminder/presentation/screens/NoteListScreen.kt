@@ -91,7 +91,8 @@ internal fun NoteListScreen(
                 }
             }
             else -> items(notes, key = { it.id }) { note ->
-                val upcoming = upcomingOccurrences(note.rule, now, limit = 1)
+                val rule = note.rule
+                val upcoming = rule?.let { upcomingOccurrences(it, now, limit = 1) }
                 Surface(
                     onClick = { onOpen(note) },
                     modifier = Modifier.fillMaxWidth(),
@@ -108,12 +109,12 @@ internal fun NoteListScreen(
                         if (note.title.isNotBlank() && note.description.isNotBlank()) {
                             Text(note.description, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
-                        if (upcoming != null) {
+                        if (rule != null && upcoming != null) {
                             val next = upcoming.firstOrNull()
                             val detail = if (next == null) {
                                 stringResource(Res.string.reminder_no_upcoming)
                             } else {
-                                stringResource(Res.string.reminder_next, occurrenceLabel(next, note.rule))
+                                stringResource(Res.string.reminder_next, occurrenceLabel(next, rule))
                             }
                             Text(
                                 detail,

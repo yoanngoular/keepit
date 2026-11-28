@@ -78,7 +78,7 @@ internal fun NoteEditorScreen(
     val rule = remember(
         draft.date, draft.time, draft.zoneId, draft.interval, draft.ordinal, draft.weekday, draft.endDate,
         draft.cadence, draft.intervalWeeks, draft.weeklyDays, draft.intervalDays, draft.intervalYears,
-        draft.monthlyPattern, draft.dayOfMonth,
+        draft.monthlyPattern, draft.dayOfMonth, draft.hasReminder,
     ) {
         draft.parseRule()
     }
@@ -89,8 +89,8 @@ internal fun NoteEditorScreen(
     val hasContent = draft.title.isNotBlank() || draft.description.isNotBlank()
     var rejectedOnSave by remember(draft) { mutableStateOf(false) }
     val pastOneTime = rejectedOnSave || rule?.isPastOneTimeChange(originalRule, now) == true
-    val canSave = rule != null && hasOccurrence && hasContent && !pastOneTime
-    var showTimeZone by rememberSaveable(draft.id) { mutableStateOf(false) }
+    val canSave = hasContent && (!draft.hasReminder || (hasOccurrence && !pastOneTime))
+    var showTimeZone by rememberSaveable(draft.id, draft.hasReminder) { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
@@ -120,12 +120,25 @@ internal fun NoteEditorScreen(
                     Text(stringResource(Res.string.reminder_content_hint), style = MaterialTheme.typography.bodySmall)
                 }
             }
-            Panel {
-                Text(
-                    stringResource(Res.string.reminder_schedule),
-                    Modifier.semantics { heading() },
-                    style = MaterialTheme.typography.titleLarge,
-                )
+            if (!draft.hasReminder) {
+                OutlinedButton(onClick = { onChange(draft.addReminder()) }, enabled = !saving) {
+                    Text(stringResource(Res.string.reminder_add))
+                }
+            } else Panel {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(Res.string.reminder_schedule),
+                        Modifier.weight(1f).semantics { heading() },
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    TextButton(onClick = { onChange(draft.copy(hasReminder = false)) }, enabled = !saving) {
+                        Text(stringResource(Res.string.reminder_remove))
+                    }
+                }
                 ReminderDateTimeFields(
                     date = draft.date,
                     time = draft.time,
@@ -238,7 +251,7 @@ internal fun NoteEditorScreen(
                 onClick = {
                     if (rule?.isPastOneTimeChange(originalRule, Clock.System.now()) == true) {
                         rejectedOnSave = true
-                    } else if (rule != null) {
+                    } else {
                         onSave(draft.toNote(rule))
                     }
                 },

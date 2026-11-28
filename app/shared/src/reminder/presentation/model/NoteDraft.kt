@@ -41,8 +41,9 @@ internal data class NoteDraft(
     val intervalYears: String = "1",
     val monthlyPattern: MonthlyPattern = MonthlyPattern.WEEKDAY,
     val dayOfMonth: String = "1",
+    val hasReminder: Boolean = false,
 ) {
-    fun parseRule(): ReminderRule? = runCatching {
+    fun parseRule(): ReminderRule? = if (!hasReminder) null else runCatching {
         val parsedDate = LocalDate.parse(date.trim())
         require(parsedDate.year in 1..9999)
         val parsedTime = LocalTime.parse(time.trim())
@@ -73,6 +74,22 @@ internal data class NoteDraft(
         }
     }.getOrNull()
 
+    fun addReminder(now: Instant = Clock.System.now(), zone: TimeZone = TimeZone.currentSystemDefault()): NoteDraft {
+        val nextHour = generateSequence(now + 1.hours) { it + 1.hours }
+            .map { it.toLocalDateTime(zone) }
+            .map { LocalDateTime(it.date, LocalTime(it.hour, 0)) }
+            .first { it.toInstant(zone) > now }
+        return copy(
+            hasReminder = true,
+            date = nextHour.date.toString(),
+            time = nextHour.time.toString(),
+            dayOfMonth = nextHour.date.day.toString(),
+            zoneId = zone.id,
+            cadence = RepeatCadence.ONCE,
+            endDate = null,
+        )
+    }
+
     private fun restoreEndDate(value: String): LocalDate? {
         val legacyCount = value.toIntOrNull()
         if (legacyCount == null) return runCatching { LocalDate.parse(value) }.getOrNull()
@@ -86,11 +103,11 @@ internal data class NoteDraft(
         return dates.take(legacyCount).lastOrNull()
     }
 
-    fun toNote(rule: ReminderRule): ReminderNote = ReminderNote(
+    fun toNote(rule: ReminderRule?): ReminderNote = ReminderNote(
         id = id,
         title = title.trim(),
         description = description.trim(),
-        rule = rule,
+        rule = if (hasReminder) rule else null,
     )
 
     companion object {
@@ -101,7 +118,7 @@ internal data class NoteDraft(
                         id, title, description, date, time, zoneId, interval, ordinal.toString(), weekday.name,
                         endDate?.toString().orEmpty(), isNew.toString(), cadence.name,
                         intervalWeeks, weeklyDays.joinToString(",") { it.name },
-                        intervalDays, intervalYears, monthlyPattern.name, dayOfMonth,
+                        intervalDays, intervalYears, monthlyPattern.name, dayOfMonth, hasReminder.toString(),
                     )
                 }.orEmpty()
             },
@@ -127,30 +144,24 @@ internal data class NoteDraft(
                     dayOfMonth = values.getOrNull(17) ?: runCatching {
                         LocalDate.parse(values[4]).day.toString()
                     }.getOrDefault("1"),
+                    hasReminder = values.getOrNull(18)?.toBooleanStrict() ?: true,
                 ).let { it.copy(endDate = it.restoreEndDate(values[9])) }
             },
         )
 
         @OptIn(ExperimentalUuidApi::class)
-        fun new(now: Instant = Clock.System.now(), zone: TimeZone = TimeZone.currentSystemDefault()): NoteDraft {
-            val nextHour = generateSequence(now + 1.hours) { it + 1.hours }
-                .map { it.toLocalDateTime(zone) }
-                .map { LocalDateTime(it.date, LocalTime(it.hour, 0)) }
-                .first { it.toInstant(zone) > now }
-            return NoteDraft(
-                id = Uuid.random().toString(),
-                isNew = true,
-                title = "",
-                description = "",
-                date = nextHour.date.toString(),
-                time = nextHour.time.toString(),
-                dayOfMonth = nextHour.date.day.toString(),
-                zoneId = zone.id,
-                interval = "2",
-                ordinal = 2,
-                weekday = DayOfWeek.TUESDAY,
-            )
-        }
+        fun new(): NoteDraft = NoteDraft(
+            id = Uuid.random().toString(),
+            isNew = true,
+            title = "",
+            description = "",
+            date = "",
+            time = "",
+            zoneId = "",
+            interval = "2",
+            ordinal = 2,
+            weekday = DayOfWeek.TUESDAY,
+        )
 
         fun fromNote(note: ReminderNote): NoteDraft {
             val rule = note.rule
@@ -159,16 +170,17 @@ internal data class NoteDraft(
                 isNew = false,
                 title = note.title,
                 description = note.description,
-                date = rule.startDate.toString(),
-                time = rule.time.toString(),
-                dayOfMonth = rule.startDate.day.toString(),
-                zoneId = rule.zoneId,
+                date = rule?.startDate?.toString().orEmpty(),
+                time = rule?.time?.toString().orEmpty(),
+                dayOfMonth = rule?.startDate?.day?.toString() ?: "1",
+                zoneId = rule?.zoneId.orEmpty(),
+                hasReminder = rule != null,
                 interval = "2",
                 ordinal = 2,
                 weekday = DayOfWeek.TUESDAY,
             )
             return when (rule) {
-                is OneTimeReminderRule -> draft
+                null, is OneTimeReminderRule -> draft
                 is DailyReminderRule -> draft.copy(
                     cadence = RepeatCadence.DAILY,
                     intervalDays = rule.intervalDays.toString(),

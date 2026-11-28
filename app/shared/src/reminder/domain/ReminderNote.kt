@@ -4,5 +4,5 @@ data class ReminderNote(
     val id: String,
     val title: String,
     val description: String,
-    val rule: ReminderRule,
+    val rule: ReminderRule? = null,
 )
