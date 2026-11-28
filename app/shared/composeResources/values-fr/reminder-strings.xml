@@ -4,7 +4,7 @@
     <string name="reminder_new_note">Nouvelle note</string>
     <string name="reminder_enable_notifications">Réglages des notifications</string>
     <string name="reminder_empty_title">Gardez l’essentiel en tête</string>
-    <string name="reminder_empty_body">Créez une note et choisissez quand KeepIt doit vous la rappeler.</string>
+    <string name="reminder_empty_body">Créez une note et ajoutez un rappel si besoin.</string>
     <string name="reminder_no_upcoming">Aucun rappel à venir</string>
     <string name="reminder_next">Prochain rappel · %1$s</string>
     <string name="reminder_load_failed">Impossible de charger vos notes.</string>
@@ -27,6 +27,8 @@
     <string name="reminder_description">Détails</string>
     <string name="reminder_content_hint">Saisissez un titre ou ajoutez des détails.</string>
     <string name="reminder_schedule">Rappel</string>
+    <string name="reminder_add">Ajouter un rappel</string>
+    <string name="reminder_remove">Retirer le rappel</string>
     <string name="reminder_repeat">Répéter</string>
     <string name="reminder_repeat_off">Désactivé</string>
     <string name="reminder_monthly">Mensuelle</string>

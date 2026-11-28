@@ -63,30 +63,37 @@ internal class DeviceReminders private constructor(context: Context) : ReminderS
     override suspend fun save(note: ReminderNote) = withContext(Dispatchers.IO) {
         deliveryLock.withLock {
             val previous = database.find(note.id)
-            val now = Clock.System.now()
-            require(!note.rule.isPastOneTimeChange(previous?.note?.rule, now)) {
-                "A new or changed one-time reminder must be in the future."
-            }
-            val row = if (previous?.note?.rule == note.rule) previous.copy(note = note) else {
-                StoredNote(
-                    note,
-                    UUID.randomUUID().toString(),
-                    ReminderDeliveryPolicy.initialConsumed(note.rule, now),
-                )
+            val rule = note.rule
+            val row = when {
+                rule == null -> StoredNote(note, revision = null, consumed = 0)
+                previous?.note?.rule == rule -> previous.copy(note = note)
+                else -> {
+                    val now = Clock.System.now()
+                    require(!rule.isPastOneTimeChange(previous?.note?.rule, now)) {
+                        "A new or changed one-time reminder must be in the future."
+                    }
+                    StoredNote(note, UUID.randomUUID().toString(), ReminderDeliveryPolicy.initialConsumed(rule, now))
+                }
             }
             database.save(row)
-            guardScheduling { schedule(row) }
+            if (rule != null) {
+                guardScheduling { schedule(row) }
+            } else if (previous?.note?.rule != null) {
+                cancelReminder(note.id)
+            }
         }
     }
 
     override suspend fun delete(id: String) = withContext(Dispatchers.IO) {
         deliveryLock.withLock {
             database.delete(id)
-            guardScheduling {
-                alarms.cancel(id)
-                notifications.cancel(id)
-            }
+            cancelReminder(id)
         }
+    }
+
+    private fun cancelReminder(id: String) {
+        guardScheduling { alarms.cancel(id) }
+        guardScheduling { notifications.cancel(id) }
     }
 
     suspend fun reconcile() = withContext(Dispatchers.IO) {
@@ -103,9 +110,11 @@ internal class DeviceReminders private constructor(context: Context) : ReminderS
     }
 
     private fun schedule(row: StoredNote) {
-        val occurrence = ReminderDeliveryPolicy.next(row.note.rule, row.consumed, Clock.System.now())
+        val rule = row.note.rule ?: return
+        val revision = checkNotNull(row.revision)
+        val occurrence = ReminderDeliveryPolicy.next(rule, row.consumed, Clock.System.now())
             ?: return alarms.cancel(row.note.id)
-        alarms.schedule(row.note.id, row.revision, occurrence)
+        alarms.schedule(row.note.id, revision, occurrence)
     }
 
     suspend fun receive(intent: Intent) = withContext(Dispatchers.IO) {
@@ -116,16 +125,18 @@ internal class DeviceReminders private constructor(context: Context) : ReminderS
         if (intent.action != AlarmScheduler.ACTION) return
         val id = ReminderRoute.noteId(intent.data) ?: return
         val row = database.find(id) ?: return
+        val rule = row.note.rule ?: return
+        val revision = row.revision ?: return
         when (val decision = ReminderDeliveryPolicy.onAlarm(
-            rule = row.note.rule,
+            rule = rule,
             consumed = row.consumed,
             now = Clock.System.now(),
-            revision = row.revision,
+            revision = revision,
             alarmRevision = intent.getStringExtra(AlarmScheduler.REVISION),
             alarmNumber = intent.getIntExtra(AlarmScheduler.NUMBER, 0),
         )) {
             AlarmDecision.Ignore -> return
-            is AlarmDecision.Rearm -> alarms.schedule(id, row.revision, decision.occurrence)
+            is AlarmDecision.Rearm -> alarms.schedule(id, revision, decision.occurrence)
             is AlarmDecision.Deliver -> {
                 // A failed or disabled notification consumes this occurrence. Future occurrences still run.
                 guardScheduling { notifications.show(row.note) }
