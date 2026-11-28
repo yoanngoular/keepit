@@ -2,10 +2,13 @@ package com.ygoular.keepit.reminder.storage
 
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
+import com.ygoular.keepit.reminder.domain.DailyReminderRule
+import com.ygoular.keepit.reminder.domain.MonthlyDayReminderRule
 import com.ygoular.keepit.reminder.domain.MonthlyReminderRule
 import com.ygoular.keepit.reminder.domain.OneTimeReminderRule
 import com.ygoular.keepit.reminder.domain.ReminderNote
 import com.ygoular.keepit.reminder.domain.WeeklyReminderRule
+import com.ygoular.keepit.reminder.domain.YearlyReminderRule
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.DayOfWeek
@@ -78,7 +81,7 @@ class NoteDatabaseTest {
         driver.open(path).use { connection ->
             connection.prepare("PRAGMA user_version").use { statement ->
                 statement.step()
-                assertEquals(4, statement.getInt(0))
+                assertEquals(5, statement.getInt(0))
             }
             connection.prepare("SELECT rowid FROM notes WHERE id = 'newer'").use { statement ->
                 statement.step()
@@ -140,7 +143,7 @@ class NoteDatabaseTest {
         driver.open(path).use { connection ->
             connection.prepare("PRAGMA user_version").use { statement ->
                 statement.step()
-                assertEquals(4, statement.getInt(0))
+                assertEquals(5, statement.getInt(0))
             }
             connection.prepare("SELECT rowid FROM notes WHERE id = 'weekly'").use { statement ->
                 statement.step()
@@ -162,6 +165,81 @@ class NoteDatabaseTest {
 
         // Apia skipped the last occurrence's civil date. The migrated limit still uses that date.
         assertEquals(listOf(once, weekly, row("monthly").copy(consumed = 4)), NoteDatabase(driver, path).all())
+    }
+
+    @Test
+    fun upgradesVersionFourPreservingExistingRuleValuesAndAlarmState() = onDisk { path ->
+        driver.open(path).use { connection ->
+            connection.execSQL("""CREATE TABLE notes (
+                id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL,
+                start_date TEXT NOT NULL, local_time TEXT NOT NULL, zone_id TEXT NOT NULL,
+                interval_months INTEGER, ordinal INTEGER, weekday TEXT,
+                end_date TEXT, revision TEXT NOT NULL, consumed INTEGER NOT NULL,
+                rule_kind TEXT NOT NULL, interval_weeks INTEGER, weekdays TEXT,
+                CHECK (
+                    (rule_kind = 'monthly' AND interval_months IS NOT NULL AND ordinal IS NOT NULL AND weekday IS NOT NULL
+                        AND interval_weeks IS NULL AND weekdays IS NULL)
+                    OR
+                    (rule_kind = 'weekly' AND interval_months IS NULL AND ordinal IS NULL AND weekday IS NULL
+                        AND interval_weeks IS NOT NULL AND weekdays IS NOT NULL)
+                    OR
+                    (rule_kind = 'once' AND end_date IS NULL AND interval_months IS NULL AND ordinal IS NULL
+                        AND weekday IS NULL AND interval_weeks IS NULL AND weekdays IS NULL)
+                ))""")
+            connection.execSQL("""INSERT INTO notes VALUES (
+                'monthly', 'Title', 'Body', '2026-11-01', '08:30', 'Europe/Paris', 2, 3, 'TUESDAY',
+                '2028-03-21', 'revision', 4, 'monthly', NULL, NULL),
+                ('weekly', 'Weekly', 'Body', '2026-11-28', '10:15', 'UTC', NULL, NULL, NULL,
+                NULL, 'weekly-revision', 2, 'weekly', 3, 'MONDAY,FRIDAY'),
+                ('once', 'Once', 'Body', '2026-11-29', '12:30', 'UTC', NULL, NULL, NULL,
+                NULL, 'once-revision', 1, 'once', NULL, NULL)""")
+            connection.execSQL("UPDATE notes SET rowid = 32 WHERE id = 'once'")
+            connection.execSQL("PRAGMA user_version = 4")
+        }
+        val weeklyRule = WeeklyReminderRule(
+            LocalDate(2026, 11, 28), LocalTime(10, 15), "UTC", 3,
+            setOf(DayOfWeek.MONDAY, DayOfWeek.FRIDAY), null,
+        )
+        val weekly = StoredNote(ReminderNote("weekly", "Weekly", "Body", weeklyRule), "weekly-revision", 2)
+        val onceRule = OneTimeReminderRule(LocalDate(2026, 11, 29), LocalTime(12, 30), "UTC")
+        val once = StoredNote(ReminderNote("once", "Once", "Body", onceRule), "once-revision", 1)
+
+        assertEquals(listOf(once, weekly, row("monthly").copy(consumed = 4)), NoteDatabase(driver, path).all())
+        driver.open(path).use { connection ->
+            connection.prepare("SELECT rowid FROM notes WHERE id = 'once'").use { statement ->
+                statement.step()
+                assertEquals(32L, statement.getLong(0))
+            }
+        }
+    }
+
+    @Test
+    fun roundTripsNewCadencesAndLastWeekdayAcrossReopens() = onDisk { path ->
+        val start = LocalDate(2026, 11, 28)
+        val time = LocalTime(8, 30)
+        val through = LocalDate(2028, 11, 28)
+        val storedRules = listOf(
+            DailyReminderRule(start, time, "UTC", 7, through),
+            YearlyReminderRule(start, time, "Europe/Paris", 2, null),
+            MonthlyDayReminderRule(start, time, "UTC", 3, 31, through),
+            MonthlyReminderRule(start, time, "UTC", 2, -1, DayOfWeek.FRIDAY, through),
+        )
+        val rows = storedRules.mapIndexed { index, rule ->
+            StoredNote(ReminderNote(index.toString(), "Title", "Body", rule), "cadence-$index", 0)
+        }
+        val db = NoteDatabase(driver, path)
+        rows.forEach { db.save(it) }
+        assertEquals(rows.reversed(), NoteDatabase(driver, path).all())
+
+        // Replacing a daily rule with a different cadence clears unused fields in the existing row.
+        val replacement = rows[0].copy(note = rows[0].note.copy(rule = storedRules[2]))
+        db.save(replacement)
+        assertEquals(replacement, NoteDatabase(driver, path).find("0"))
+        driver.open(path).use { connection ->
+            assertFailsWith<RuntimeException> {
+                connection.execSQL("UPDATE notes SET interval_days = 7 WHERE id = '0'")
+            }
+        }
     }
 
     @Test
@@ -225,7 +303,7 @@ class NoteDatabaseTest {
                 statement.step()
                 assertEquals("Latest", statement.getText(0))
             }
-            connection.prepare("SELECT count(*) FROM sqlite_master WHERE name = 'notes_v4'").use { statement ->
+            connection.prepare("SELECT count(*) FROM sqlite_master WHERE name = 'notes_v5'").use { statement ->
                 statement.step()
                 assertEquals(0, statement.getInt(0))
             }

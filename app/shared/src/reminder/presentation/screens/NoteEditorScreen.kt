@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.ygoular.keepit.reminder.domain.MonthlyReminderRule
 import com.ygoular.keepit.reminder.domain.ReminderNote
 import com.ygoular.keepit.reminder.domain.ReminderRule
 import com.ygoular.keepit.reminder.presentation.components.ErrorText
@@ -49,12 +50,14 @@ import com.ygoular.keepit.reminder.presentation.components.upcomingOccurrences
 import com.ygoular.keepit.reminder.presentation.format.occurrenceLabel
 import com.ygoular.keepit.reminder.presentation.format.ordinalLabel
 import com.ygoular.keepit.reminder.presentation.format.weekdayLabel
+import com.ygoular.keepit.reminder.presentation.model.MonthlyPattern
 import com.ygoular.keepit.reminder.presentation.model.NoteDraft
 import com.ygoular.keepit.reminder.presentation.model.RepeatCadence
 import com.ygoular.keepit.reminder.domain.isPastOneTimeChange
 import com.ygoular.keepit.resources.*
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.Month
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Clock
@@ -74,7 +77,8 @@ internal fun NoteEditorScreen(
 ) {
     val rule = remember(
         draft.date, draft.time, draft.zoneId, draft.interval, draft.ordinal, draft.weekday, draft.endDate,
-        draft.cadence, draft.intervalWeeks, draft.weeklyDays,
+        draft.cadence, draft.intervalWeeks, draft.weeklyDays, draft.intervalDays, draft.intervalYears,
+        draft.monthlyPattern, draft.dayOfMonth,
     ) {
         draft.parseRule()
     }
@@ -133,8 +137,10 @@ internal fun NoteEditorScreen(
                     label = Res.string.reminder_repeat,
                     options = listOf(
                         stringResource(Res.string.reminder_repeat_off),
-                        stringResource(Res.string.reminder_monthly),
+                        stringResource(Res.string.reminder_daily),
                         stringResource(Res.string.reminder_weekly),
+                        stringResource(Res.string.reminder_monthly),
+                        stringResource(Res.string.reminder_yearly),
                     ),
                     selected = draft.cadence.ordinal,
                     onChoose = { onChange(draft.copy(cadence = RepeatCadence.entries[it])) },
@@ -142,6 +148,22 @@ internal fun NoteEditorScreen(
                 )
                 when (draft.cadence) {
                     RepeatCadence.ONCE -> Unit
+                    RepeatCadence.DAILY -> Field(
+                        Res.string.reminder_interval_days, draft.intervalDays,
+                        { onChange(draft.copy(intervalDays = it)) }, enabled = !saving, numeric = true,
+                    )
+                    RepeatCadence.YEARLY -> {
+                        Field(
+                            Res.string.reminder_interval_years, draft.intervalYears,
+                            { onChange(draft.copy(intervalYears = it)) }, enabled = !saving, numeric = true,
+                        )
+                        if (startDate?.month == Month.FEBRUARY && startDate.day == 29) {
+                            Text(
+                                stringResource(Res.string.reminder_leap_day_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
                     RepeatCadence.MONTHLY -> MonthlySettings(draft, onChange, enabled = !saving)
                     RepeatCadence.WEEKLY -> {
                         Field(
@@ -235,11 +257,30 @@ private fun MonthlySettings(draft: NoteDraft, onChange: (NoteDraft) -> Unit, ena
         Res.string.reminder_interval, draft.interval, { onChange(draft.copy(interval = it)) },
         enabled = enabled, numeric = true,
     )
+    Choice(
+        label = Res.string.reminder_monthly_pattern,
+        options = listOf(
+            stringResource(Res.string.reminder_monthly_by_weekday),
+            stringResource(Res.string.reminder_monthly_by_day),
+        ),
+        selected = draft.monthlyPattern.ordinal,
+        onChoose = { onChange(draft.copy(monthlyPattern = MonthlyPattern.entries[it])) },
+        enabled = enabled,
+    )
+    if (draft.monthlyPattern == MonthlyPattern.DAY_OF_MONTH) {
+        Field(
+            Res.string.reminder_day_of_month, draft.dayOfMonth, { onChange(draft.copy(dayOfMonth = it)) },
+            enabled = enabled, numeric = true,
+        )
+        Text(stringResource(Res.string.reminder_short_month_hint), style = MaterialTheme.typography.bodySmall)
+        return
+    }
+
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        val ordinals = (1..5).map { ordinalLabel(it) }
+        val ordinals = (1..5).toList() + MonthlyReminderRule.LAST
         Choice(
-            Res.string.reminder_ordinal, ordinals, draft.ordinal - 1,
-            onChoose = { onChange(draft.copy(ordinal = it + 1)) },
+            Res.string.reminder_ordinal, ordinals.map { ordinalLabel(it) }, ordinals.indexOf(draft.ordinal),
+            onChoose = { onChange(draft.copy(ordinal = ordinals[it])) },
             enabled = enabled,
             modifier = Modifier.weight(1f),
         )

@@ -1,11 +1,14 @@
 package com.ygoular.keepit.reminder.presentation.model
 
 import androidx.compose.runtime.saveable.listSaver
+import com.ygoular.keepit.reminder.domain.DailyReminderRule
+import com.ygoular.keepit.reminder.domain.MonthlyDayReminderRule
 import com.ygoular.keepit.reminder.domain.MonthlyReminderRule
 import com.ygoular.keepit.reminder.domain.OneTimeReminderRule
 import com.ygoular.keepit.reminder.domain.ReminderNote
 import com.ygoular.keepit.reminder.domain.ReminderRule
 import com.ygoular.keepit.reminder.domain.WeeklyReminderRule
+import com.ygoular.keepit.reminder.domain.YearlyReminderRule
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
@@ -34,6 +37,10 @@ internal data class NoteDraft(
     val cadence: RepeatCadence = RepeatCadence.ONCE,
     val intervalWeeks: String = "1",
     val weeklyDays: Set<DayOfWeek> = setOf(DayOfWeek.MONDAY),
+    val intervalDays: String = "1",
+    val intervalYears: String = "1",
+    val monthlyPattern: MonthlyPattern = MonthlyPattern.WEEKDAY,
+    val dayOfMonth: String = "1",
 ) {
     fun parseRule(): ReminderRule? = runCatching {
         val parsedDate = LocalDate.parse(date.trim())
@@ -41,15 +48,17 @@ internal data class NoteDraft(
         val parsedTime = LocalTime.parse(time.trim())
         when (cadence) {
             RepeatCadence.ONCE -> OneTimeReminderRule(parsedDate, parsedTime, zoneId.trim())
-            RepeatCadence.MONTHLY -> MonthlyReminderRule(
-                startDate = parsedDate,
-                time = parsedTime,
-                zoneId = zoneId.trim(),
-                intervalMonths = interval.trim().toInt(),
-                ordinal = ordinal,
-                weekday = weekday,
-                endDate = endDate,
+            RepeatCadence.DAILY -> DailyReminderRule(
+                parsedDate, parsedTime, zoneId.trim(), intervalDays.trim().toInt(), endDate,
             )
+            RepeatCadence.MONTHLY -> when (monthlyPattern) {
+                MonthlyPattern.WEEKDAY -> MonthlyReminderRule(
+                    parsedDate, parsedTime, zoneId.trim(), interval.trim().toInt(), ordinal, weekday, endDate,
+                )
+                MonthlyPattern.DAY_OF_MONTH -> MonthlyDayReminderRule(
+                    parsedDate, parsedTime, zoneId.trim(), interval.trim().toInt(), dayOfMonth.trim().toInt(), endDate,
+                )
+            }
             RepeatCadence.WEEKLY -> WeeklyReminderRule(
                 startDate = parsedDate,
                 time = parsedTime,
@@ -57,6 +66,9 @@ internal data class NoteDraft(
                 intervalWeeks = intervalWeeks.trim().toInt(),
                 weekdays = weeklyDays,
                 endDate = endDate,
+            )
+            RepeatCadence.YEARLY -> YearlyReminderRule(
+                parsedDate, parsedTime, zoneId.trim(), intervalYears.trim().toInt(), endDate,
             )
         }
     }.getOrNull()
@@ -89,6 +101,7 @@ internal data class NoteDraft(
                         id, title, description, date, time, zoneId, interval, ordinal.toString(), weekday.name,
                         endDate?.toString().orEmpty(), isNew.toString(), cadence.name,
                         intervalWeeks, weeklyDays.joinToString(",") { it.name },
+                        intervalDays, intervalYears, monthlyPattern.name, dayOfMonth,
                     )
                 }.orEmpty()
             },
@@ -108,6 +121,12 @@ internal data class NoteDraft(
                     intervalWeeks = values.getOrNull(12) ?: "1",
                     weeklyDays = values.getOrNull(13)?.split(',')?.filter(String::isNotEmpty)
                         ?.map(DayOfWeek::valueOf)?.toSet() ?: setOf(DayOfWeek.MONDAY),
+                    intervalDays = values.getOrNull(14) ?: "1",
+                    intervalYears = values.getOrNull(15) ?: "1",
+                    monthlyPattern = values.getOrNull(16)?.let(MonthlyPattern::valueOf) ?: MonthlyPattern.WEEKDAY,
+                    dayOfMonth = values.getOrNull(17) ?: runCatching {
+                        LocalDate.parse(values[4]).day.toString()
+                    }.getOrDefault("1"),
                 ).let { it.copy(endDate = it.restoreEndDate(values[9])) }
             },
         )
@@ -125,6 +144,7 @@ internal data class NoteDraft(
                 description = "",
                 date = nextHour.date.toString(),
                 time = nextHour.time.toString(),
+                dayOfMonth = nextHour.date.day.toString(),
                 zoneId = zone.id,
                 interval = "2",
                 ordinal = 2,
@@ -141,6 +161,7 @@ internal data class NoteDraft(
                 description = note.description,
                 date = rule.startDate.toString(),
                 time = rule.time.toString(),
+                dayOfMonth = rule.startDate.day.toString(),
                 zoneId = rule.zoneId,
                 interval = "2",
                 ordinal = 2,
@@ -148,6 +169,23 @@ internal data class NoteDraft(
             )
             return when (rule) {
                 is OneTimeReminderRule -> draft
+                is DailyReminderRule -> draft.copy(
+                    cadence = RepeatCadence.DAILY,
+                    intervalDays = rule.intervalDays.toString(),
+                    endDate = rule.endDate,
+                )
+                is YearlyReminderRule -> draft.copy(
+                    cadence = RepeatCadence.YEARLY,
+                    intervalYears = rule.intervalYears.toString(),
+                    endDate = rule.endDate,
+                )
+                is MonthlyDayReminderRule -> draft.copy(
+                    cadence = RepeatCadence.MONTHLY,
+                    monthlyPattern = MonthlyPattern.DAY_OF_MONTH,
+                    interval = rule.intervalMonths.toString(),
+                    dayOfMonth = rule.dayOfMonth.toString(),
+                    endDate = rule.endDate,
+                )
                 is MonthlyReminderRule -> draft.copy(
                     cadence = RepeatCadence.MONTHLY,
                     interval = rule.intervalMonths.toString(),

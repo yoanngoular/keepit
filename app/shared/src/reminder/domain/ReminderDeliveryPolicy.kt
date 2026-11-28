@@ -57,7 +57,11 @@ object ReminderDeliveryPolicy {
 }
 
 private fun ReminderRule.hasDirectCursor(): Boolean =
-    this is WeeklyReminderRule || (this is MonthlyReminderRule && ordinal < 5)
+    when (this) {
+        is OneTimeReminderRule -> false
+        is MonthlyReminderRule -> ordinal != 5
+        is DailyReminderRule, is WeeklyReminderRule, is MonthlyDayReminderRule, is YearlyReminderRule -> true
+    }
 
 /** A missing occurrence is the upper boundary for a finite series. */
 private fun ReminderRule.firstMatchingIndex(matches: (Instant) -> Boolean): Int {

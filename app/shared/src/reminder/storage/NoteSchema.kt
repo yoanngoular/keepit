@@ -5,7 +5,7 @@ import androidx.sqlite.async.executeSQL
 import androidx.sqlite.async.prepare
 import androidx.sqlite.async.step
 
-private const val VERSION = 4
+private const val VERSION = 5
 
 private fun createNotes(table: String) = """CREATE TABLE $table (
     id TEXT PRIMARY KEY NOT NULL,
@@ -14,22 +14,23 @@ private fun createNotes(table: String) = """CREATE TABLE $table (
     interval_months INTEGER, ordinal INTEGER, weekday TEXT,
     end_date TEXT, revision TEXT NOT NULL, consumed INTEGER NOT NULL,
     rule_kind TEXT NOT NULL, interval_weeks INTEGER, weekdays TEXT,
-    CHECK (
-        (rule_kind = 'monthly' AND interval_months IS NOT NULL AND ordinal IS NOT NULL AND weekday IS NOT NULL
-            AND interval_weeks IS NULL AND weekdays IS NULL)
-        OR
-        (rule_kind = 'weekly' AND interval_months IS NULL AND ordinal IS NULL AND weekday IS NULL
-            AND interval_weeks IS NOT NULL AND weekdays IS NOT NULL)
-        OR
-        (rule_kind = 'once' AND end_date IS NULL AND interval_months IS NULL AND ordinal IS NULL
-            AND weekday IS NULL AND interval_weeks IS NULL AND weekdays IS NULL)
-    ))"""
+    interval_days INTEGER, interval_years INTEGER, day_of_month INTEGER,
+    CHECK (rule_kind IN ('monthly', 'weekly', 'once', 'daily', 'yearly', 'monthly_day')),
+    CHECK ((rule_kind IN ('monthly', 'monthly_day')) = (interval_months IS NOT NULL)),
+    CHECK ((rule_kind = 'monthly') = (ordinal IS NOT NULL)),
+    CHECK ((rule_kind = 'monthly') = (weekday IS NOT NULL)),
+    CHECK ((rule_kind = 'weekly') = (interval_weeks IS NOT NULL)),
+    CHECK ((rule_kind = 'weekly') = (weekdays IS NOT NULL)),
+    CHECK ((rule_kind = 'daily') = (interval_days IS NOT NULL)),
+    CHECK ((rule_kind = 'yearly') = (interval_years IS NOT NULL)),
+    CHECK ((rule_kind = 'monthly_day') = (day_of_month IS NOT NULL)),
+    CHECK (rule_kind <> 'once' OR end_date IS NULL))"""
 
 private suspend fun SQLiteConnection.rebuildNotes(version: Int) {
-    executeSQL(createNotes("notes_v4"))
+    executeSQL(createNotes("notes_v5"))
     copyLegacyNotes(version)
     executeSQL("DROP TABLE notes")
-    executeSQL("ALTER TABLE notes_v4 RENAME TO notes")
+    executeSQL("ALTER TABLE notes_v5 RENAME TO notes")
 }
 
 private suspend fun SQLiteConnection.version(): Int =
@@ -46,7 +47,7 @@ internal suspend fun SQLiteConnection.ensureNoteSchema() {
             // Another connection may have migrated the schema while we waited for the lock.
             VERSION -> Unit
             0 -> executeSQL(createNotes("notes"))
-            1, 2, 3 -> rebuildNotes(current)
+            1, 2, 3, 4 -> rebuildNotes(current)
             else -> error("Missing KeepIt migration from $current to $VERSION")
         }
         executeSQL("PRAGMA user_version = $VERSION")
